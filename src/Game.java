@@ -139,40 +139,95 @@ public class Game {
         }
     }
 
-    private Piece findProtectingGuard(Attack attack) { // TODO
-        int centerPoint = 7;
+    private Piece findProtectingGuard(Attack attack) {
         int xDif = -attack.xChange;
         int yDif = -attack.yChange;
+
         if (xDif == 0 && yDif == 1) {
-            Piece g1 = (attack.xFrom > 0) ? board[attack.xFrom - 1][attack.yFrom].getPiece() : null;
-            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
-            Piece g2 = (attack.xFrom < 7) ? board[attack.xFrom + 1][attack.yFrom].getPiece() : null;
-            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
-            if (g1 != null && g2 == null) return g1;
-            if (g1 == null && g2 != null) return g2;
-            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
-
-            g1 = (attack.xFrom > 0) ? board[attack.xFrom - 1][attack.yFrom - 1].getPiece() : null;
-            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
-            g2 = (attack.xFrom < 7) ? board[attack.xFrom + 1][attack.yFrom - 1].getPiece() : null;
-            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
-            if (g1 != null && g2 == null) return g1;
-            if (g1 == null && g2 != null) return g2;
-            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
-
-            g1 = (attack.xFrom > 0 && attack.yFrom > 0) ? board[attack.xFrom - 1][attack.yFrom - 2].getPiece() : null;
-            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
-            g2 = (attack.xFrom < 7 && attack.yFrom > 0) ? board[attack.xFrom + 1][attack.yFrom - 2].getPiece() : null;
-            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
-            if (g1 != null && g2 == null) return g1;
-            if (g1 == null && g2 != null) return g2;
-            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
-
-            g1 = (attack.yFrom > 0) ? board[attack.xFrom][attack.yFrom - 2].getPiece() : null;
-            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
-            return g1;
+            int[][] directions = {
+                    { -1, 0 }, { 1, 0 }, // 1
+                    { -1, -1 }, { 1, -1 }, // 2
+                    { -1, -2 }, { 1, -2 }, // 3
+                    { 0, -2 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == -1 && yDif == 1) {
+            int[][] directions = {
+                    { 0, 1 }, { 1, 0 }, // 1
+                    { 0, -2 }, { 2, 0 }, // 2
+                    { 1, -2 }, { 2, -1 }, // 3
+                    { 2, -2 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == -1 && yDif == 0) {
+            int[][] directions = {
+                    { 0, -1 }, { 0, 1 }, // 1
+                    { 1, -1 }, { 1, 1 }, // 2
+                    { 2, -1 }, { 2, 1 }, // 3
+                    { 2, 0 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == -1 && yDif == -1) {
+            int[][] directions = {
+                    { 1, 0 }, { 0, 1 }, // 1
+                    { 2, 0 }, { 0, 2 }, // 2
+                    { 2, 1 }, { 1, 2 }, // 3
+                    { 2, 2 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == 0 && yDif == -1) {
+            int[][] directions = {
+                    { 1, 0 }, { -1, 0 }, // 1
+                    { 1, 1 }, { -1, 1 }, // 2
+                    { 1, 2 }, { -1, 2 }, // 3
+                    { 0, 2 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == 1 && yDif == -1) {
+            int[][] directions = {
+                    { 0, 1 }, { -1, 0 }, // 1
+                    { 0, 2 }, { -2, 0 }, // 2
+                    { -1, 2 }, { -2, 1 }, // 3
+                    { -2, 2 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == 1 && yDif == 0) {
+            int[][] directions = {
+                    { 0, -1 }, { 0, 1 }, // 1
+                    { -1, -1 }, { -1, 1 }, // 2
+                    { -2, -1 }, { -2, 1 }, // 3
+                    { -2, 0 } // 4
+            };
+            closestGuard(directions, attack);
+        } else if (xDif == 1 && yDif == 1) {
+            int[][] directions = {
+                    { 0, -1 }, { -1, 0 }, // 1
+                    { 0, -2 }, { -2, 0 }, // 2
+                    { -1, -2 }, { -2, -1 }, // 3
+                    { -2, -2 } // 4
+            };
+            closestGuard(directions, attack);
         }
         return null;
+    }
+    
+    private Piece closestGuard(int[][] directions, Attack attack) {
+        Piece closestGuard = null;
+        for (int[] dir : directions) {
+            int x = attack.xFrom + dir[0];
+            int y = attack.yFrom + dir[1];
+
+            if (x >= 0 && x < 8 && y >= 0 && y < 8) {
+                Piece potentialGuard = board[x][y].getPiece();
+                if (potentialGuard != null && potentialGuard.getType() == PieceType.guard) {
+                    if (closestGuard == null ||
+                            x + y - 7 < closestGuard.getXPos() + closestGuard.getYPos() - 7) {
+                        closestGuard = potentialGuard;
+                    }
+                }
+            }
+        }
+        return closestGuard;
     }
 
     private boolean isLegalAttack(Attack attack) {
