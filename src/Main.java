@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 public class Main {
     public static void main(String[] args) {
         System.out.println("Boot - [project-roe]\n");
@@ -6,12 +8,10 @@ public class Main {
         game.printBoardCoordinates();
         game.printBoardPieces(false);
         game.printBoardPieces(true);
-        game.doMove(new Move(1, 7, 0, -2));
-        game.printBoardPieces(false);
-        game.printBoardPieces(true);
-        game.doMove(new Move(3, 6, 0, -1));
-        game.printBoardPieces(false);
-        game.printBoardPieces(true);
+        ArrayList<Move> moves = game.generatePossibleMoves(game.getPlayer(false));
+        for (Move move: moves) {
+            move.print();
+        }
         System.out.println("\nClose - [project-roe]");
     }
 }

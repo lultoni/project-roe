@@ -29,4 +29,12 @@ public class Piece {
     public boolean getPlayer() {
         return player;
     }
+
+    public int getXPos() {
+        return xPos;
+    }
+
+    public int getYPos() {
+        return yPos;
+    }
 }

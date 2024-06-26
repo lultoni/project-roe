@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 public class Game {
     private Tile[][] board;
     private Player player0;
@@ -86,6 +88,35 @@ public class Game {
         setPiece(2, 1, p1p[9]);
     }
 
+    public ArrayList<Move> generatePossibleMoves(Player player) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        for (Piece piece : player.getPieces()) {
+            int xPos = piece.getXPos();
+            int yPos = piece.getYPos();
+            int range = getRange(xPos, yPos);
+
+            for (int xChange = -range; xChange <= range; xChange++) {
+                for (int yChange = -range; yChange <= range; yChange++) {
+                    if (xChange != 0 || yChange != 0) {
+                        int newX = xPos + xChange;
+                        int newY = yPos + yChange;
+                        if (newX >= 0 && newX <= 7 && newY >= 0 && newY <= 7) {
+                            Move move = new Move(xPos, yPos, xChange, yChange);
+                            if (isLegalMove(move)) {
+                                possibleMoves.add(move);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return possibleMoves;
+    }
+
+    private int getRange(int xPos, int yPos) {
+        return (pieceTerrainAdvantage(xPos, yPos) == 1) ? 2 : 1;
+    }
+
     public void doMove(Move move) {
         if (!isLegalMove(move)) throw new IllegalArgumentException("The Move that was provided is not Legal.\nxFrom: " + move.xFrom + "\nyFrom: " + move.yFrom + "\nxChange: " + move.xChange + "\nyChange: " + move.yChange);
         Piece piece = board[move.xFrom][move.yFrom].getPiece();
@@ -94,11 +125,11 @@ public class Game {
     }
 
     private boolean isLegalMove(Move move) {
-        int range = (pieceTerrainAdvantage(move.xFrom, move.yFrom) == 1) ? 2 : 1;
-        if (range == 1) {
-            return Math.abs(move.xChange) <= range && Math.abs(move.yChange) <= range;
+        int range = getRange(move.xFrom, move.yFrom);
+        if (range == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 0 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 0) {
+            return board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null;
         } else {
-            return Math.abs(move.xChange) <= range && Math.abs(move.yChange) <= range && isNoPieceBetween(move);
+            return Math.abs(move.xChange) <= range && Math.abs(move.yChange) <= range && board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null && isNoPieceBetween(move);
         }
     }
 
@@ -112,7 +143,7 @@ public class Game {
                     return board[move.xFrom + 1][move.yFrom + 1].getPiece() == null || board[move.xFrom + 1][move.yFrom].getPiece() == null;
                 }
                 case 0 -> {
-                    return board[move.xFrom + 1][move.yFrom + 1].getPiece() == null || board[move.xFrom + 1][move.yFrom].getPiece() == null || board[move.xFrom + 1][move.yFrom - 1].getPiece() == null;
+                    return (move.yFrom < 7 && board[move.xFrom + 1][move.yFrom + 1].getPiece() == null) || board[move.xFrom + 1][move.yFrom].getPiece() == null || (move.yFrom > 0 && board[move.xFrom + 1][move.yFrom - 1].getPiece() == null);
                 }
                 case -1 -> {
                     return board[move.xFrom + 1][move.yFrom].getPiece() == null || board[move.xFrom + 1][move.yFrom - 1].getPiece() == null;
@@ -248,5 +279,9 @@ public class Game {
             }
             System.out.println(out);
         }
+    }
+
+    public Player getPlayer(boolean player) {
+        return (player) ? player1 : player0;
     }
 }

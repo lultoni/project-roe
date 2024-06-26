@@ -10,4 +10,8 @@ public class Move {
         this.xChange = xChange;
         this.yChange = yChange;
     }
+
+    public void print() {
+        System.out.println("Move(" + xFrom + ", " + yFrom + ", " + xChange + ", " + yChange + ")");
+    }
 }
