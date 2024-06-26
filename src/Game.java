@@ -113,6 +113,31 @@ public class Game {
         return possibleMoves;
     }
 
+    public ArrayList<Attack> generatePossibleAttacks(Player player) {
+        ArrayList<Attack> possibleAttacks = new ArrayList<>();
+        for (Piece piece : player.getPieces()) {
+            int xPos = piece.getXPos();
+            int yPos = piece.getYPos();
+            int range = 1;
+
+            for (int xChange = -range; xChange <= range; xChange++) {
+                for (int yChange = -range; yChange <= range; yChange++) {
+                    if (xChange != 0 || yChange != 0) {
+                        int newX = xPos + xChange;
+                        int newY = yPos + yChange;
+                        if (newX >= 0 && newX <= 7 && newY >= 0 && newY <= 7) {
+                            Attack attack = new Attack(xPos, yPos, xChange, yChange);
+                            if (isLegalAttack(attack)) {
+                                possibleAttacks.add(attack);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return possibleAttacks;
+    }
+
     private int getRange(int xPos, int yPos) {
         return (pieceTerrainAdvantage(xPos, yPos) == 1) ? 2 : 1;
     }
@@ -145,84 +170,86 @@ public class Game {
 
         if (xDif == 0 && yDif == 1) {
             int[][] directions = {
-                    { -1, 0 }, { 1, 0 }, // 1
-                    { -1, -1 }, { 1, -1 }, // 2
-                    { -1, -2 }, { 1, -2 }, // 3
-                    { 0, -2 } // 4
+                    { -1, 0, 1 }, { 1, 0, 1 },
+                    { -1, -1, 2 }, { 1, -1, 2 },
+                    { -1, -2, 3 }, { 1, -2, 3 },
+                    { 0, -2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == -1 && yDif == 1) {
             int[][] directions = {
-                    { 0, 1 }, { 1, 0 }, // 1
-                    { 0, -2 }, { 2, 0 }, // 2
-                    { 1, -2 }, { 2, -1 }, // 3
-                    { 2, -2 } // 4
+                    { 0, 1, 1 }, { 1, 0, 1 },
+                    { 0, -2, 2 }, { 2, 0, 2 },
+                    { 1, -2, 3 }, { 2, -1, 3 },
+                    { 2, -2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == -1 && yDif == 0) {
             int[][] directions = {
-                    { 0, -1 }, { 0, 1 }, // 1
-                    { 1, -1 }, { 1, 1 }, // 2
-                    { 2, -1 }, { 2, 1 }, // 3
-                    { 2, 0 } // 4
+                    { 0, -1, 1 }, { 0, 1, 1 },
+                    { 1, -1, 2 }, { 1, 1, 2 },
+                    { 2, -1, 3 }, { 2, 1, 3 },
+                    { 2, 0, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == -1 && yDif == -1) {
             int[][] directions = {
-                    { 1, 0 }, { 0, 1 }, // 1
-                    { 2, 0 }, { 0, 2 }, // 2
-                    { 2, 1 }, { 1, 2 }, // 3
-                    { 2, 2 } // 4
+                    { 1, 0, 1 }, { 0, 1, 1 },
+                    { 2, 0, 2 }, { 0, 2, 2 },
+                    { 2, 1, 3 }, { 1, 2, 3 },
+                    { 2, 2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == 0 && yDif == -1) {
             int[][] directions = {
-                    { 1, 0 }, { -1, 0 }, // 1
-                    { 1, 1 }, { -1, 1 }, // 2
-                    { 1, 2 }, { -1, 2 }, // 3
-                    { 0, 2 } // 4
+                    { 1, 0, 1 }, { -1, 0, 1 },
+                    { 1, 1, 2 }, { -1, 1, 2 },
+                    { 1, 2, 3 }, { -1, 2, 3 },
+                    { 0, 2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == 1 && yDif == -1) {
             int[][] directions = {
-                    { 0, 1 }, { -1, 0 }, // 1
-                    { 0, 2 }, { -2, 0 }, // 2
-                    { -1, 2 }, { -2, 1 }, // 3
-                    { -2, 2 } // 4
+                    { 0, 1, 1 }, { -1, 0, 1 },
+                    { 0, 2, 2 }, { -2, 0, 2 },
+                    { -1, 2, 3 }, { -2, 1, 3 },
+                    { -2, 2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == 1 && yDif == 0) {
             int[][] directions = {
-                    { 0, -1 }, { 0, 1 }, // 1
-                    { -1, -1 }, { -1, 1 }, // 2
-                    { -2, -1 }, { -2, 1 }, // 3
-                    { -2, 0 } // 4
+                    { 0, -1, 1 }, { 0, 1, 1 },
+                    { -1, -1, 2 }, { -1, 1, 2 },
+                    { -2, -1, 3 }, { -2, 1, 3 },
+                    { -2, 0, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         } else if (xDif == 1 && yDif == 1) {
             int[][] directions = {
-                    { 0, -1 }, { -1, 0 }, // 1
-                    { 0, -2 }, { -2, 0 }, // 2
-                    { -1, -2 }, { -2, -1 }, // 3
-                    { -2, -2 } // 4
+                    { 0, -1, 1 }, { -1, 0, 1 },
+                    { 0, -2, 2 }, { -2, 0, 2 },
+                    { -1, -2, 3 }, { -2, -1, 3 },
+                    { -2, -2, 4 }
             };
-            closestGuard(directions, attack);
+            return closestGuard(directions, attack);
         }
         return null;
     }
-    
+
     private Piece closestGuard(int[][] directions, Attack attack) {
         Piece closestGuard = null;
+        int minDistance = Integer.MAX_VALUE;
         for (int[] dir : directions) {
             int x = attack.xFrom + dir[0];
             int y = attack.yFrom + dir[1];
+            int distance = dir[2];
 
             if (x >= 0 && x < 8 && y >= 0 && y < 8) {
                 Piece potentialGuard = board[x][y].getPiece();
                 if (potentialGuard != null && potentialGuard.getType() == PieceType.guard) {
-                    if (closestGuard == null ||
-                            x + y - 7 < closestGuard.getXPos() + closestGuard.getYPos() - 7) {
+                    if (closestGuard == null || distance <= minDistance && Math.abs(x + y - 7) < Math.abs(closestGuard.getXPos() + closestGuard.getYPos() - 7)) {
                         closestGuard = potentialGuard;
+                        minDistance = distance;
                     }
                 }
             }
@@ -366,7 +393,7 @@ public class Game {
     }
 
     public void printBoardCoordinates() {
-        System.out.println("BoardTerrain:");
+        System.out.println("BoardCoordinates:");
         for (int y = 0; y < 8; y++) {
             String out = "";
             for (int x = 0; x < 8; x++) {
@@ -376,14 +403,16 @@ public class Game {
         }
     }
 
-    public void printBoardPieces(boolean player) {
-        System.out.println("BoardPieces of " + (player ? "1" : "0") + ":");
+    public void printBoardPieces() {
+        System.out.println("BoardPieces of Player 0 (Blue) and Player 1 (Red):");
         for (int y = 0; y < 8; y++) {
             String out = "";
             for (int x = 0; x < 8; x++) {
                 String addition = " - ";
-                if (board[x][y].getPiece() != null && board[x][y].getPiece().getPlayer() == player)
-                    addition = switch (board[x][y].getPiece().getType()) {
+                if (board[x][y].getPiece() != null) {
+                    Piece piece = board[x][y].getPiece();
+                    String colorCode = piece.getPlayer() ? "\033[31m" : "\033[34m"; // Red for player 1, Blue for player 0
+                    String pieceChar = switch (piece.getType()) {
                         case PieceType.air -> " A ";
                         case PieceType.spirit -> " S ";
                         case PieceType.earth -> " E ";
@@ -391,6 +420,8 @@ public class Game {
                         case PieceType.guard -> " G ";
                         case PieceType.water -> " W ";
                     };
+                    addition = colorCode + pieceChar + "\033[0m";
+                }
                 out += addition;
             }
             System.out.println(out);
