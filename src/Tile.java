@@ -14,4 +14,12 @@ public class Tile {
     public Terrain getTerrain() {
         return terrain;
     }
+
+    public void setPiece(Piece piece) {
+        currentPiece = piece;
+    }
+
+    public Piece getPiece() {
+        return currentPiece;
+    }
 }
