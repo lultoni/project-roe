@@ -88,7 +88,52 @@ public class Game {
         setPiece(2, 1, p1p[9]);
     }
 
-    public ArrayList<Move> generatePossibleMoves(Player player) {
+    public void executeTurn(Turn turn, Player player) { // TODO find a way to include player other than current quick fix (and human/ai thing)
+        doMove(turn.move1, false);
+        doMove(turn.move2, false);
+        doMove(turn.move3, false);
+        resetHasMoved(player);
+        updateTimers();
+        doAttack(turn.attack);
+        for (TurnSpell spell: turn.spells) {
+            // TODO castSpell(spell) with effects and taking st of player
+        }
+        updateTimers();
+    }
+
+    public ArrayList<Turn> generatePossibleTurns(Player player) {
+        ArrayList<Turn> possibleTurns = new ArrayList<>();
+        // TODO all 3 moves, 1 attack, spell[]
+        return possibleTurns;
+    }
+
+    private void updateTimers() {
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Tile tile = board[x][y];
+                tile.setBlockedTimer(Math.max(tile.getBlockedTimer() - 0.25, 0));
+                tile.setDeathTimer(Math.max(tile.getDeathTimer() - 0.25, 0));
+            }
+        }
+        for (Piece piece: player1.getPieces()) {
+            piece.setAttackProtectedTimer(Math.max(piece.getAttackProtectedTimer() - 0.25, 0));
+            piece.setSpellProtectedTimer(Math.max(piece.getSpellProtectedTimer() - 0.25, 0));
+            piece.setSpellReflectionTimer(Math.max(piece.getSpellReflectionTimer() - 0.25, 0));
+        }
+        for (Piece piece: player0.getPieces()) {
+            piece.setAttackProtectedTimer(Math.max(piece.getAttackProtectedTimer() - 0.25, 0));
+            piece.setSpellProtectedTimer(Math.max(piece.getSpellProtectedTimer() - 0.25, 0));
+            piece.setSpellReflectionTimer(Math.max(piece.getSpellReflectionTimer() - 0.25, 0));
+        }
+    }
+
+    private void resetHasMoved(Player player) {
+        for (Piece piece: player.getPieces()) {
+            piece.setHasMoved(false);
+        }
+    }
+
+    public ArrayList<Move> generatePossibleMoves(Player player) { // TODO all 3 moves, empty move for only doing 1/2 moves?
         ArrayList<Move> possibleMoves = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
             int xPos = piece.getXPos();
@@ -113,7 +158,7 @@ public class Game {
         return possibleMoves;
     }
 
-    public ArrayList<Attack> generatePossibleAttacks(Player player) {
+    public ArrayList<Attack> generatePossibleAttacks(Player player) { // TODO empty attack?
         ArrayList<Attack> possibleAttacks = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
             int xPos = piece.getXPos();
@@ -142,25 +187,30 @@ public class Game {
         return (pieceTerrainAdvantage(xPos, yPos) == 1) ? 2 : 1;
     }
 
-    public void doMove(Move move) {
-        if (!isLegalMove(move)) throw new IllegalArgumentException("The Move that was provided is not Legal.\nxFrom: " + move.xFrom + "\nyFrom: " + move.yFrom + "\nxChange: " + move.xChange + "\nyChange: " + move.yChange);
-        Piece piece = board[move.xFrom][move.yFrom].getPiece();
-        setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, piece);
-        setPiece(move.xFrom, move.yFrom, null);
+    public void doMove(Move move, boolean debug) {
+        if (move != null) {
+            if (!isLegalMove(move)) throw new IllegalArgumentException("The Move that was provided is not Legal.\nxFrom: " + move.xFrom + "\nyFrom: " + move.yFrom + "\nxChange: " + move.xChange + "\nyChange: " + move.yChange);
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
+            setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, piece);
+            setPiece(move.xFrom, move.yFrom, null);
+            if (!debug) piece.setHasMoved(true);
+        }
     }
 
     public void doAttack(Attack attack) {
-        if (!isLegalAttack(attack)) throw new IllegalArgumentException("The Attack that was provided is not Legal.\nxFrom: " + attack.xFrom + "\nyFrom: " + attack.yFrom + "\nxChange: " + attack.xChange + "\nyChange: " + attack.yChange);
-        Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
-        Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
-        Piece protectingGuard = (defendingPiece.getType() != PieceType.guard && !guardSkip(attack)) ? findProtectingGuard(attack) : null;
-        if (protectingGuard == null) {
-            defendingPiece.setPosition(-1, -1);
-            setPiece(attack.xFrom + attack.xChange, attack.yFrom + attack.yChange, attackingPiece);
-            setPiece(attack.xFrom, attack.yFrom, null);
-        } else {
-            setPiece(protectingGuard.getXPos(), protectingGuard.getYPos(), null);
-            protectingGuard.setPosition(-1, -1);
+        if (attack != null) {
+            if (!isLegalAttack(attack)) throw new IllegalArgumentException("The Attack that was provided is not Legal.\nxFrom: " + attack.xFrom + "\nyFrom: " + attack.yFrom + "\nxChange: " + attack.xChange + "\nyChange: " + attack.yChange);
+            Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
+            Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
+            Piece protectingGuard = (defendingPiece.getType() != PieceType.guard && !guardSkip(attack)) ? findProtectingGuard(attack) : null;
+            if (protectingGuard == null) {
+                defendingPiece.setPosition(-1, -1);
+                setPiece(attack.xFrom + attack.xChange, attack.yFrom + attack.yChange, attackingPiece);
+                setPiece(attack.xFrom, attack.yFrom, null);
+            } else {
+                setPiece(protectingGuard.getXPos(), protectingGuard.getYPos(), null);
+                protectingGuard.setPosition(-1, -1);
+            }
         }
     }
 
@@ -279,6 +329,7 @@ public class Game {
     }
 
     private boolean isLegalMove(Move move) {
+        if (board[move.xFrom][move.yFrom].getPiece().hasMoved()) return false;
         int range = getRange(move.xFrom, move.yFrom);
         if (range == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 0 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 0) {
             return board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null;

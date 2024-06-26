@@ -7,13 +7,13 @@ public class Main {
         game.printBoardTerrain();
         game.printBoardCoordinates();
         game.printBoardPieces();
-        game.doMove(new Move(3, 6, 0, -1));
-        game.doMove(new Move(2, 7, 1, -1));
-        game.doMove(new Move(3, 6, 0, -2));
-        game.doMove(new Move(3, 4, 0, -1));
+        game.doMove(new Move(3, 6, 0, -1), true);
+        game.doMove(new Move(2, 7, 1, -1), true);
+        game.doMove(new Move(3, 6, 0, -2), true);
+        game.doMove(new Move(3, 4, 0, -1), true);
         game.printBoardPieces();
-        game.doMove(new Move(5, 1, 0, 1));
-        game.doMove(new Move(6, 0, -2, 2));
+        game.doMove(new Move(5, 1, 0, 1), true);
+        game.doMove(new Move(6, 0, -2, 2), true);
         game.printBoardPieces();
         ArrayList<Attack> attacks = game.generatePossibleAttacks(game.getPlayer(false));
         for (Attack attack: attacks) {

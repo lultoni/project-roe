@@ -1,11 +1,12 @@
 public class Piece {
     private int xPos;
     private int yPos;
-    private PieceType type;
-    private boolean player;
+    private final PieceType type;
+    private final boolean player;
     private double spellProtectedTimer;
     private double spellReflectionTimer;
     private double attackProtectedTimer;
+    private boolean hasMoved;
 
     public Piece(PieceType type, boolean player) {
         xPos = -1;
@@ -15,6 +16,7 @@ public class Piece {
         spellProtectedTimer = 0;
         spellReflectionTimer = 0;
         attackProtectedTimer = 0;
+        hasMoved = false;
     }
 
     public void setPosition(int x, int y) {
@@ -36,5 +38,37 @@ public class Piece {
 
     public int getYPos() {
         return yPos;
+    }
+
+    public boolean hasMoved() {
+        return hasMoved;
+    }
+
+    public void setHasMoved(boolean hasMoved) {
+        this.hasMoved = hasMoved;
+    }
+
+    public double getAttackProtectedTimer() {
+        return attackProtectedTimer;
+    }
+
+    public double getSpellProtectedTimer() {
+        return spellProtectedTimer;
+    }
+
+    public double getSpellReflectionTimer() {
+        return spellReflectionTimer;
+    }
+
+    public void setAttackProtectedTimer(double attackProtectedTimer) {
+        this.attackProtectedTimer = attackProtectedTimer;
+    }
+
+    public void setSpellProtectedTimer(double spellProtectedTimer) {
+        this.spellProtectedTimer = spellProtectedTimer;
+    }
+
+    public void setSpellReflectionTimer(double spellReflectionTimer) {
+        this.spellReflectionTimer = spellReflectionTimer;
     }
 }

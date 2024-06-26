@@ -1,7 +1,7 @@
 public class Player {
     private int spellTokens;
-    private Piece[] pieces;
-    private boolean isHuman;
+    private final Piece[] pieces;
+    private final boolean isHuman;
 
     public Player(Piece[] pieces, boolean isHuman) {
         spellTokens = 5;
