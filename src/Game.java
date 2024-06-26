@@ -124,6 +124,67 @@ public class Game {
         setPiece(move.xFrom, move.yFrom, null);
     }
 
+    public void doAttack(Attack attack) {
+        if (!isLegalAttack(attack)) throw new IllegalArgumentException("The Attack that was provided is not Legal.\nxFrom: " + attack.xFrom + "\nyFrom: " + attack.yFrom + "\nxChange: " + attack.xChange + "\nyChange: " + attack.yChange);
+        Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
+        Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
+        Piece protectingGuard = (defendingPiece.getType() != PieceType.guard) ? findProtectingGuard(attack) : null;
+        if (protectingGuard == null) {
+            defendingPiece.setPosition(-1, -1);
+            setPiece(attack.xFrom + attack.xChange, attack.yFrom + attack.yChange, attackingPiece);
+            setPiece(attack.xFrom, attack.yFrom, null);
+        } else {
+            setPiece(protectingGuard.getXPos(), protectingGuard.getYPos(), null);
+            protectingGuard.setPosition(-1, -1);
+        }
+    }
+
+    private Piece findProtectingGuard(Attack attack) { // TODO
+        int centerPoint = 7;
+        int xDif = -attack.xChange;
+        int yDif = -attack.yChange;
+        if (xDif == 0 && yDif == 1) {
+            Piece g1 = (attack.xFrom > 0) ? board[attack.xFrom - 1][attack.yFrom].getPiece() : null;
+            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
+            Piece g2 = (attack.xFrom < 7) ? board[attack.xFrom + 1][attack.yFrom].getPiece() : null;
+            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
+            if (g1 != null && g2 == null) return g1;
+            if (g1 == null && g2 != null) return g2;
+            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
+
+            g1 = (attack.xFrom > 0) ? board[attack.xFrom - 1][attack.yFrom - 1].getPiece() : null;
+            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
+            g2 = (attack.xFrom < 7) ? board[attack.xFrom + 1][attack.yFrom - 1].getPiece() : null;
+            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
+            if (g1 != null && g2 == null) return g1;
+            if (g1 == null && g2 != null) return g2;
+            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
+
+            g1 = (attack.xFrom > 0 && attack.yFrom > 0) ? board[attack.xFrom - 1][attack.yFrom - 2].getPiece() : null;
+            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
+            g2 = (attack.xFrom < 7 && attack.yFrom > 0) ? board[attack.xFrom + 1][attack.yFrom - 2].getPiece() : null;
+            if (g2 != null) g2 = (g2.getType() == PieceType.guard) ? g2 : null;
+            if (g1 != null && g2 == null) return g1;
+            if (g1 == null && g2 != null) return g2;
+            if (g1 != null) return (g1.getXPos() + g1.getYPos() - centerPoint <= g2.getXPos() + g2.getYPos() - centerPoint) ? g1 : g2;
+
+            g1 = (attack.yFrom > 0) ? board[attack.xFrom][attack.yFrom - 2].getPiece() : null;
+            if (g1 != null) g1 = (g1.getType() == PieceType.guard) ? g1 : null;
+            return g1;
+        }
+        return null;
+    }
+
+    private boolean isLegalAttack(Attack attack) {
+        int range = getRange(attack.xFrom, attack.yFrom);
+        if (range == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 0 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 0) {
+            Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
+            Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
+            return defendingPiece != null && defendingPiece.getPlayer() != attackingPiece.getPlayer();
+        }
+        return false;
+    }
+
     private boolean isLegalMove(Move move) {
         int range = getRange(move.xFrom, move.yFrom);
         if (range == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 0 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 0) {
@@ -164,10 +225,10 @@ public class Game {
         } else if (move.xChange == 0) {
             switch (move.yChange) {
                 case -2 -> {
-                    return board[move.xFrom - 1][move.yFrom - 1].getPiece() == null || board[move.xFrom][move.yFrom - 1].getPiece() == null || board[move.xFrom + 1][move.yFrom - 1].getPiece() == null;
+                    return (move.xFrom > 0 && board[move.xFrom - 1][move.yFrom - 1].getPiece() == null) || board[move.xFrom][move.yFrom - 1].getPiece() == null || (move.xFrom < 7 && board[move.xFrom + 1][move.yFrom - 1].getPiece() == null);
                 }
                 case 2 -> {
-                    return board[move.xFrom - 1][move.yFrom + 1].getPiece() == null || board[move.xFrom][move.yFrom + 1].getPiece() == null || board[move.xFrom + 1][move.yFrom + 1].getPiece() == null;
+                    return (move.xFrom > 0 && board[move.xFrom - 1][move.yFrom + 1].getPiece() == null) || board[move.xFrom][move.yFrom + 1].getPiece() == null || (move.xFrom < 7 && board[move.xFrom + 1][move.yFrom + 1].getPiece() == null);
                 }
             }
         } else if (move.xChange == -1) {
@@ -188,7 +249,7 @@ public class Game {
                     return board[move.xFrom - 1][move.yFrom + 1].getPiece() == null || board[move.xFrom - 1][move.yFrom].getPiece() == null;
                 }
                 case 0 -> {
-                    return board[move.xFrom - 1][move.yFrom + 1].getPiece() == null || board[move.xFrom - 1][move.yFrom].getPiece() == null || board[move.xFrom - 1][move.yFrom - 1].getPiece() == null;
+                    return (move.yFrom < 7 && board[move.xFrom - 1][move.yFrom + 1].getPiece() == null) || board[move.xFrom - 1][move.yFrom].getPiece() == null || (move.yFrom > 0 && board[move.xFrom - 1][move.yFrom - 1].getPiece() == null);
                 }
                 case -1 -> {
                     return board[move.xFrom - 1][move.yFrom].getPiece() == null || board[move.xFrom - 1][move.yFrom - 1].getPiece() == null;
