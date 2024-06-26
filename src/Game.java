@@ -178,7 +178,7 @@ public class Game {
             return closestGuard(directions, attack);
         } else if (xDif == -1 && yDif == 1) {
             int[][] directions = {
-                    { 0, 1, 1 }, { 1, 0, 1 },
+                    { 0, -1, 1 }, { 1, 0, 1 },
                     { 0, -2, 2 }, { 2, 0, 2 },
                     { 1, -2, 3 }, { 2, -1, 3 },
                     { 2, -2, 4 }
@@ -247,7 +247,9 @@ public class Game {
             if (x >= 0 && x < 8 && y >= 0 && y < 8) {
                 Piece potentialGuard = board[x][y].getPiece();
                 if (potentialGuard != null && potentialGuard.getType() == PieceType.guard) {
-                    if (closestGuard == null || distance <= minDistance && Math.abs(x + y - 7) < Math.abs(closestGuard.getXPos() + closestGuard.getYPos() - 7)) {
+                    int currentGuardDistance = Math.abs(x + y - 7);
+                    int closestGuardDistance = closestGuard != null ? Math.abs(closestGuard.getXPos() + closestGuard.getYPos() - 7) : Integer.MAX_VALUE;
+                    if (closestGuard == null || distance < minDistance || (distance == minDistance && currentGuardDistance < closestGuardDistance)) {
                         closestGuard = potentialGuard;
                         minDistance = distance;
                     }
