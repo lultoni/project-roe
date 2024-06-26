@@ -153,7 +153,7 @@ public class Game {
         if (!isLegalAttack(attack)) throw new IllegalArgumentException("The Attack that was provided is not Legal.\nxFrom: " + attack.xFrom + "\nyFrom: " + attack.yFrom + "\nxChange: " + attack.xChange + "\nyChange: " + attack.yChange);
         Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
         Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
-        Piece protectingGuard = (defendingPiece.getType() != PieceType.guard) ? findProtectingGuard(attack) : null;
+        Piece protectingGuard = (defendingPiece.getType() != PieceType.guard && !guardSkip(attack)) ? findProtectingGuard(attack) : null;
         if (protectingGuard == null) {
             defendingPiece.setPosition(-1, -1);
             setPiece(attack.xFrom + attack.xChange, attack.yFrom + attack.yChange, attackingPiece);
@@ -162,6 +162,15 @@ public class Game {
             setPiece(protectingGuard.getXPos(), protectingGuard.getYPos(), null);
             protectingGuard.setPosition(-1, -1);
         }
+    }
+
+    private boolean guardSkip(Attack attack) {
+        Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
+        Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
+        return attackingPiece.getType() == PieceType.water && defendingPiece.getType() == PieceType.fire ||
+                attackingPiece.getType() == PieceType.fire && defendingPiece.getType() == PieceType.air ||
+                attackingPiece.getType() == PieceType.air && defendingPiece.getType() == PieceType.earth ||
+                attackingPiece.getType() == PieceType.earth && defendingPiece.getType() == PieceType.water;
     }
 
     private Piece findProtectingGuard(Attack attack) {
