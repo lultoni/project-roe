@@ -156,10 +156,56 @@ public class Game {
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
         ArrayList<Turn> possibleTurns = new ArrayList<>();
-        // TODO all 3 moves
-        // TODO 1 attack
-        // TODO spell[]
+
+        // x x x
+        possibleTurns.add(new Turn(null, null, null, null, null));
+        // x a x
+        ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
+        if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
+            possibleTurns.add(new Turn(null, null, null, attack, null));
+        }
+        // x x s
+        ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = generatePossibleSpellCombinations(player);
+        if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
+            possibleTurns.add(new Turn(null, null, null, null, spells));
+        }
+        // x a s
+        if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
+            if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
+                possibleTurns.add(new Turn(null, null, null, attack, spells));
+            }
+        }
+        // m x x TODO
+        // m a x TODO
+        // m x s TODO
+        // m a s TODO
+        // m m x x TODO
+        // m m a x TODO
+        // m m x s TODO
+        // m m a s TODO
+        // m m m x x TODO
+        // m m m a x TODO
+        // m m m x s TODO
+        // m m m a s TODO
+
+        ArrayList<Move> possibleMoves = generatePossibleMoves(player);
+
         return possibleTurns;
+    }
+
+    public void copyGameState() {
+        // TODO: Implement the copy game state logic
+    }
+
+    public void saveGameState() {
+        // TODO: Implement the save game state logic
+    }
+
+    public ArrayList<ArrayList<TurnSpell>> generatePossibleSpellCombinations(Player player) {
+        ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = new ArrayList<>();
+        // TODO generate all possible spell combinations
+        // TODO no empty spell combination
+        return possibleSpellCombinations;
     }
 
     private void updateTimers() {
@@ -188,7 +234,7 @@ public class Game {
         }
     }
 
-    public ArrayList<Move> generatePossibleMoves(Player player) { // TODO all 3 moves, empty move for only doing 1/2 moves?
+    public ArrayList<Move> generatePossibleMoves(Player player) {
         ArrayList<Move> possibleMoves = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
             int xPos = piece.getXPos();
@@ -213,7 +259,7 @@ public class Game {
         return possibleMoves;
     }
 
-    public ArrayList<Attack> generatePossibleAttacks(Player player) { // TODO empty attack?
+    public ArrayList<Attack> generatePossibleAttacks(Player player) {
         ArrayList<Attack> possibleAttacks = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
             int xPos = piece.getXPos();
