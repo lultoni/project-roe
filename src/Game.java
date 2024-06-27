@@ -88,7 +88,60 @@ public class Game {
         setPiece(2, 1, p1p[9]);
     }
 
-    public void executeTurn(Turn turn, Player player) { // TODO find a way to include player other than current quick fix (and human/ai thing)
+    public void startGame() {
+        while(isGameOver() == 2) {
+            printBoardPieces();
+            ArrayList<Turn> possibleTurns = generatePossibleTurns(player0);
+            Turn turn = player0.fetchTurn(possibleTurns);
+            System.out.println("Player0 Turn:");
+            turn.print();
+            executeTurn(turn, player0);
+            printBoardPieces();
+            possibleTurns = generatePossibleTurns(player1);
+            turn = player1.fetchTurn(possibleTurns);
+            System.out.println("Player1 Turn:");
+            turn.print();
+            executeTurn(turn, player1);
+            if(isGameOver() != 2) printBoardPieces();
+        }
+        switch (isGameOver()) {
+            case -1 -> System.out.println("Draw between p0 and p1");
+            case 0 -> System.out.println("Win for p0");
+            case 1 -> System.out.println("Win for p1");
+        }
+    }
+
+    private int isGameOver() {
+        // Win p0 = 0
+        // Win p1 = 1
+        // Draw = -1
+        // game isn't over = 2
+        boolean isOnlyP0Spirit = false;
+        boolean isOnlyP1Spirit = false;
+        for(Piece piece: player0.getPieces()) {
+            if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
+                return 1;
+            }
+            if (piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1) {
+                isOnlyP0Spirit = true;
+            } else {
+                isOnlyP0Spirit = false;
+            }
+        }
+        for(Piece piece: player1.getPieces()) {
+            if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
+                return 0;
+            }
+            if (piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1) {
+                isOnlyP1Spirit = true;
+            } else {
+                isOnlyP1Spirit = false;
+            }
+        }
+        return (isOnlyP0Spirit && isOnlyP1Spirit) ? -1 : 2;
+    }
+
+    private void executeTurn(Turn turn, Player player) {
         doMove(turn.move1, false);
         doMove(turn.move2, false);
         doMove(turn.move3, false);
@@ -103,7 +156,9 @@ public class Game {
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
         ArrayList<Turn> possibleTurns = new ArrayList<>();
-        // TODO all 3 moves, 1 attack, spell[]
+        // TODO all 3 moves
+        // TODO 1 attack
+        // TODO spell[]
         return possibleTurns;
     }
 
