@@ -122,21 +122,13 @@ public class Game {
             if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
                 return 1;
             }
-            if (piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1) {
-                isOnlyP0Spirit = true;
-            } else {
-                isOnlyP0Spirit = false;
-            }
+            isOnlyP0Spirit = piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1;
         }
         for(Piece piece: player1.getPieces()) {
             if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
                 return 0;
             }
-            if (piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1) {
-                isOnlyP1Spirit = true;
-            } else {
-                isOnlyP1Spirit = false;
-            }
+            isOnlyP1Spirit = piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1;
         }
         return (isOnlyP0Spirit && isOnlyP1Spirit) ? -1 : 2;
     }
@@ -148,7 +140,7 @@ public class Game {
         resetHasMoved(player);
         updateTimers();
         doAttack(turn.attack);
-        for (TurnSpell spell: turn.spells) {
+        if (turn.spells != null) for (TurnSpell spell: turn.spells) {
             // TODO castSpell(spell) with effects and taking st of player
         }
         updateTimers();
@@ -157,40 +149,233 @@ public class Game {
     public ArrayList<Turn> generatePossibleTurns(Player player) {
         ArrayList<Turn> possibleTurns = new ArrayList<>();
 
+        int tempSize = 0;
+
         // x x x
         possibleTurns.add(new Turn(null, null, null, null, null));
+        System.out.println("(x x x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
         // x a x
         ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             possibleTurns.add(new Turn(null, null, null, attack, null));
         }
+        System.out.println("(x a x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
         // x x s
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = generatePossibleSpellCombinations(player);
         if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
             possibleTurns.add(new Turn(null, null, null, null, spells));
         }
+        System.out.println("(x x s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
         // x a s
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
                 possibleTurns.add(new Turn(null, null, null, attack, spells));
             }
         }
-        // m x x TODO
-        // m a x TODO
-        // m x s TODO
-        // m a s TODO
-        // m m x x TODO
-        // m m a x TODO
-        // m m x s TODO
-        // m m a s TODO
-        // m m m x x TODO
-        // m m m a x TODO
-        // m m m x s TODO
-        // m m m a s TODO
+        System.out.println("(x a s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
 
+        // m x x
         ArrayList<Move> possibleMoves = generatePossibleMoves(player);
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            possibleTurns.add(new Turn(move, null, null, null, null));
+        }
+        System.out.println("(m x x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m a x
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleAttacks = generatePossibleAttacks(player);
+            if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
+                possibleTurns.add(new Turn(move, null, null, attack, null));
+            }
+            undoMove(move);
+        }
+        resetHasMoved(player);
+        System.out.println("(m a x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m x s
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleSpellCombinations = generatePossibleSpellCombinations(player);
+            if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
+                possibleTurns.add(new Turn(move, null, null, null, spells));
+            }
+            undoMove(move);
+        }
+        resetHasMoved(player);
+        System.out.println("(m x s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m a s
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleAttacks = generatePossibleAttacks(player);
+            if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
+                Piece piece = storePieceOfAttack(attack);
+                doAttack(attack);
+                possibleSpellCombinations = generatePossibleSpellCombinations(player);
+                if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
+                    possibleTurns.add(new Turn(move, null, null, attack, spells));
+                }
+                undoAttack(attack, piece);
+            }
+            undoMove(move);
+        }
+        resetHasMoved(player);
+        System.out.println("(m a s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m x x
+        ArrayList<Move> possibleMovesAfterMove1 = new ArrayList<>();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                possibleTurns.add(new Turn(move, move2, null, null, null));
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m x x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m a x
+        ArrayList<Attack> possibleAttacksAfterMove1 = new ArrayList<>();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, false);
+                possibleAttacksAfterMove1 = generatePossibleAttacks(player);
+                if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
+                    possibleTurns.add(new Turn(move, move2, null, attack, null));
+                }
+                undoMove(move2);
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m a x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m x s TODO
+        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1 = new ArrayList<>();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, true);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
+                if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
+                    possibleTurns.add(new Turn(move, move2, null, null, spells));
+                }
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m x s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m a s TODO  // TODO attack spells on the same one that is being attacked can't be included... (do attack, undo attack)
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, true);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                possibleAttacksAfterMove1 = generatePossibleAttacks(player);
+                if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
+                    if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
+                        possibleTurns.add(new Turn(move, move2, null, attack, spells));
+                    }
+                }
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m a s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m m x x TODO
+        ArrayList<Move> possibleMovesAfterMove2 = new ArrayList<>();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, true);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, true);
+                possibleMovesAfterMove2 = generatePossibleMoves(player);
+                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+                    possibleTurns.add(new Turn(move, move2, move3, null, null));
+                }
+                undoMove(move2);
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m m x x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m m a x TODO  // TODO move and then generate attacks
+        ArrayList<Attack> possibleAttacksAfterMove2 = new ArrayList<>();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, true);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, true);
+                possibleMovesAfterMove2 = generatePossibleMoves(player);
+                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+                    possibleTurns.add(new Turn(move, move2, move3, null, null));
+                }
+                undoMove(move2);
+            }
+            undoMove(move);
+        }
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m m a x) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m m x s TODO
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m m x s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
+
+        // m m m a s TODO  // TODO attack spells on the same one that is being attacked can't be included... (do attack, undo attack)
+        setPiecesStart();
+        resetHasMoved(player);
+        System.out.println("(m m m a s) - " + (possibleTurns.size() - tempSize));
+        tempSize = possibleTurns.size();
 
         return possibleTurns;
+    }
+
+    private void undoAttack(Attack attack, Piece piece) { // TODO test this function to see if everything works correctly
+        Move move = new Move(attack.xFrom + attack.xChange, attack.yFrom + attack.yChange, -attack.xChange, -attack.yChange);
+        doMove(move, true);
+        setPiece(move.xFrom, move.yFrom, piece);
+    }
+
+    private Piece storePieceOfAttack(Attack attack) { // TODO test this function to see if everything works correctly
+        // TODO guards protecting
+        return board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
+    }
+
+    private void undoMove(Move move) {
+        Piece piece = board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece();
+        setPiece(move.xFrom, move.yFrom, piece);
+        setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, null);
     }
 
     public void copyGameState() {

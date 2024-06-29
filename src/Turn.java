@@ -16,7 +16,8 @@ public class Turn {
     }
 
     public void print() {
-        if (move1 != null) { // TODO fix if you change this approach
+        System.out.println("Turn {");
+        if (move1 != null) {
             System.out.println("Move 1:");
             move1.print();
         }
@@ -38,6 +39,6 @@ public class Turn {
                 spell.print();
             }
         }
-
+        System.out.println("}");
     }
 }
