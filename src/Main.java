@@ -6,6 +6,7 @@ public class Main {
         Game game = new Game();
         ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(false));
         System.out.println("PossibleTurns: " + possibleTurns.size());
+        System.out.println("\n\n---Starting Game---");
         game.startGame();
         System.out.println("\nClose - [project-roe]");
     }

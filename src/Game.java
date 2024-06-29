@@ -152,44 +152,45 @@ public class Game {
         int tempSize = 0;
 
         // x x x
+        int[][] position = fetchPositionPieces();
         possibleTurns.add(new Turn(null, null, null, null, null));
-        System.out.println("(x x x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("x x x", tempSize, player, possibleTurns, position);
 
         // x a x
+        position = fetchPositionPieces();
         ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             possibleTurns.add(new Turn(null, null, null, attack, null));
         }
-        System.out.println("(x a x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("x a x", tempSize, player, possibleTurns, position);
 
         // x x s
+        position = fetchPositionPieces();
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = generatePossibleSpellCombinations(player);
         if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
             possibleTurns.add(new Turn(null, null, null, null, spells));
         }
-        System.out.println("(x x s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("x x s", tempSize, player, possibleTurns, position);
 
         // x a s
+        position = fetchPositionPieces();
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
                 possibleTurns.add(new Turn(null, null, null, attack, spells));
             }
         }
-        System.out.println("(x a s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("x a s", tempSize, player, possibleTurns, position);
 
         // m x x
+        position = fetchPositionPieces();
         ArrayList<Move> possibleMoves = generatePossibleMoves(player);
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             possibleTurns.add(new Turn(move, null, null, null, null));
         }
-        System.out.println("(m x x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m x x", tempSize, player, possibleTurns, position);
 
         // m a x
+        position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             doMove(move, false);
             possibleAttacks = generatePossibleAttacks(player);
@@ -198,11 +199,10 @@ public class Game {
             }
             undoMove(move);
         }
-        resetHasMoved(player);
-        System.out.println("(m a x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m a x", tempSize, player, possibleTurns, position);
 
         // m x s
+        position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             doMove(move, false);
             possibleSpellCombinations = generatePossibleSpellCombinations(player);
@@ -211,11 +211,10 @@ public class Game {
             }
             undoMove(move);
         }
-        resetHasMoved(player);
-        System.out.println("(m x s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m x s", tempSize, player, possibleTurns, position);
 
         // m a s
+        position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             doMove(move, false);
             possibleAttacks = generatePossibleAttacks(player);
@@ -230,12 +229,11 @@ public class Game {
             }
             undoMove(move);
         }
-        resetHasMoved(player);
-        System.out.println("(m a s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m a s", tempSize, player, possibleTurns, position);
 
         // m m x x
-        ArrayList<Move> possibleMovesAfterMove1 = new ArrayList<>();
+        position = fetchPositionPieces();
+        ArrayList<Move> possibleMovesAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
@@ -244,13 +242,11 @@ public class Game {
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m x x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m x x", tempSize, player, possibleTurns, position);
 
         // m m a x
-        ArrayList<Attack> possibleAttacksAfterMove1 = new ArrayList<>();
+        position = fetchPositionPieces();
+        ArrayList<Attack> possibleAttacksAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
@@ -264,55 +260,57 @@ public class Game {
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m a x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m a x", tempSize, player, possibleTurns, position);
 
-        // m m x s TODO
-        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1 = new ArrayList<>();
+        // m m x s
+        position = fetchPositionPieces();
+        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, true);
+            doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, false);
                 possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                 if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
                     possibleTurns.add(new Turn(move, move2, null, null, spells));
                 }
+                undoMove(move2);
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m x s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m x s", tempSize, player, possibleTurns, position);
 
-        // m m a s TODO  // TODO attack spells on the same one that is being attacked can't be included... (do attack, undo attack)
+        // m m a s
+        position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, true);
+            doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, false);
                 possibleAttacksAfterMove1 = generatePossibleAttacks(player);
                 if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
+                    Piece piece = storePieceOfAttack(attack);
+                    doAttack(attack);
+                    possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
                         possibleTurns.add(new Turn(move, move2, null, attack, spells));
                     }
+                    undoAttack(attack, piece);
                 }
+                undoMove(move2);
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m a s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m a s", tempSize, player, possibleTurns, position);
 
-        // m m m x x TODO
-        ArrayList<Move> possibleMovesAfterMove2 = new ArrayList<>();
+        // m m m x x
+        position = fetchPositionPieces();
+        ArrayList<Move> possibleMovesAfterMove2;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, true);
+            doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, true);
+                doMove(move2, false);
                 possibleMovesAfterMove2 = generatePossibleMoves(player);
                 if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
                     possibleTurns.add(new Turn(move, move2, move3, null, null));
@@ -321,44 +319,136 @@ public class Game {
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m m x x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m m x x", tempSize, player, possibleTurns, position);
 
-        // m m m a x TODO  // TODO move and then generate attacks
-        ArrayList<Attack> possibleAttacksAfterMove2 = new ArrayList<>();
+        // m m m a x
+        position = fetchPositionPieces();
+        ArrayList<Attack> possibleAttacksAfterMove2;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, true);
+            doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, true);
+                doMove(move2, false);
                 possibleMovesAfterMove2 = generatePossibleMoves(player);
                 if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    possibleTurns.add(new Turn(move, move2, move3, null, null));
+                    doMove(move3, false);
+                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
+                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
+                        possibleTurns.add(new Turn(move, move2, move3, attack, null));
+                    }
+                    undoMove(move3);
                 }
                 undoMove(move2);
             }
             undoMove(move);
         }
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m m a x) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        tempSize = logAndResetState("m m m a x", tempSize, player, possibleTurns, position);
 
-        // m m m x s TODO
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m m x s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        // m m m x s
+        position = fetchPositionPieces();
+        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove2;
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, false);
+                possibleMovesAfterMove2 = generatePossibleMoves(player);
+                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+                    doMove(move3, false);
+                    possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
+                    if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spell: possibleSpellsAfterMove2) {
+                        possibleTurns.add(new Turn(move, move2, move3, null, spell));
+                    }
+                    undoMove(move3);
+                }
+                undoMove(move2);
+            }
+            undoMove(move);
+        }
+        tempSize = logAndResetState("m m m x s", tempSize, player, possibleTurns, position);
 
-        // m m m a s TODO  // TODO attack spells on the same one that is being attacked can't be included... (do attack, undo attack)
-        setPiecesStart();
-        resetHasMoved(player);
-        System.out.println("(m m m a s) - " + (possibleTurns.size() - tempSize));
-        tempSize = possibleTurns.size();
+        // m m m a s
+        position = fetchPositionPieces();
+        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            doMove(move, false);
+            possibleMovesAfterMove1 = generatePossibleMoves(player);
+            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                doMove(move2, false);
+                possibleMovesAfterMove2 = generatePossibleMoves(player);
+                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+                    doMove(move3, false);
+                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
+                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
+                        Piece piece = storePieceOfAttack(attack);
+                        doAttack(attack);
+                        possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
+                        if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove2) {
+                            possibleTurns.add(new Turn(move, move2, move3, attack, spells));
+                        }
+                        undoAttack(attack, piece);
+                    }
+                    undoMove(move3);
+                }
+                undoMove(move2);
+            }
+            undoMove(move);
+        }
+        logAndResetState("m m m a s", tempSize, player, possibleTurns, position);
 
         return possibleTurns;
+    }
+
+    private int[][] fetchPositionPieces() {
+        int[][] positions = new int[20][2];
+
+        Piece[] p0p = player0.getPieces();
+        Piece[] p1p = player1.getPieces();
+
+        for (int i = 0; i < 10; i++) {
+            positions[i][0] = p0p[i].getXPos();
+            positions[i][1] = p0p[i].getYPos();
+            positions[i + 10][0] = p1p[i].getXPos();
+            positions[i + 10][1] = p1p[i].getYPos();
+        }
+
+        return positions;
+    }
+
+
+    private int logAndResetState(String text, int tempSize, Player player, ArrayList<Turn> possibleTurns, int[][] position) {
+        setPiecesPosition(position);
+        resetHasMoved(player);
+        System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
+        return possibleTurns.size();
+    }
+
+    private void setPiecesPosition(int[][] position) {
+        Piece[] p0p = player0.getPieces();
+        Piece[] p1p = player1.getPieces();
+
+        setPiece(position[0][0], position[0][1], p0p[0]);
+        setPiece(position[1][0], position[1][1], p0p[1]);
+        setPiece(position[2][0], position[2][1], p0p[2]);
+        setPiece(position[3][0], position[3][1], p0p[3]);
+        setPiece(position[4][0], position[4][1], p0p[4]);
+
+        setPiece(position[10][0], position[10][1], p1p[0]);
+        setPiece(position[11][0], position[11][1], p1p[1]);
+        setPiece(position[12][0], position[12][1], p1p[2]);
+        setPiece(position[13][0], position[13][1], p1p[3]);
+        setPiece(position[14][0], position[14][1], p1p[4]);
+
+        setPiece(position[5][0], position[5][1], p0p[5]);
+        setPiece(position[6][0], position[6][1], p0p[6]);
+        setPiece(position[7][0], position[7][1], p0p[7]);
+        setPiece(position[8][0], position[8][1], p0p[8]);
+        setPiece(position[9][0], position[9][1], p0p[9]);
+
+        setPiece(position[15][0], position[15][1], p1p[5]);
+        setPiece(position[16][0], position[16][1], p1p[6]);
+        setPiece(position[17][0], position[17][1], p1p[7]);
+        setPiece(position[18][0], position[18][1], p1p[8]);
+        setPiece(position[19][0], position[19][1], p1p[9]);
     }
 
     private void undoAttack(Attack attack, Piece piece) { // TODO test this function to see if everything works correctly
@@ -376,6 +466,7 @@ public class Game {
         Piece piece = board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece();
         setPiece(move.xFrom, move.yFrom, piece);
         setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, null);
+        piece.setHasMoved(false);
     }
 
     public void copyGameState() {
@@ -719,36 +810,8 @@ public class Game {
     }
 
     private void setPiece(int x, int y, Piece piece) {
-        board[x][y].setPiece(piece);
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) board[x][y].setPiece(piece);
         if (piece != null) piece.setPosition(x, y);
-    }
-
-    public void printBoardTerrain() {
-        System.out.println("BoardTerrain:");
-        for (int y = 0; y < 8; y++) {
-            String out = "";
-            for (int x = 0; x < 8; x++) {
-                String addition = switch (board[x][y].getTerrain()) {
-                    case Terrain.forest -> " F ";
-                    case Terrain.plains -> " P ";
-                    case Terrain.mountain -> " M ";
-                    case Terrain.lake -> " L ";
-                };
-                out += addition;
-            }
-            System.out.println(out);
-        }
-    }
-
-    public void printBoardCoordinates() {
-        System.out.println("BoardCoordinates:");
-        for (int y = 0; y < 8; y++) {
-            String out = "";
-            for (int x = 0; x < 8; x++) {
-                out += " x" + x + "y" + y + " ";
-            }
-            System.out.println(out);
-        }
     }
 
     public void printBoardPieces() {
