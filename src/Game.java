@@ -33,8 +33,8 @@ public class Game {
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true)};
-        player0 = new Player(p0p, true);
-        player1 = new Player(p1p, true);
+        player0 = new Player(p0p, false);
+        player1 = new Player(p1p, false);
         setPiecesStart();
 
         turnCounter = 1;
@@ -92,13 +92,14 @@ public class Game {
         setPiece(2, 1, p1p[9]);
     }
 
-    public void startGame(boolean player) {
+    public void startGame() {
+        boolean player = turnCounter % 1 != 0;
         while(isGameOver() == 2) {
-            System.out.println("CURRENT TURN: " + turnCounter);
+            System.out.println("\nCURRENT TURN: " + turnCounter);
             Player p = getPlayer(player);
             printBoardPieces();
             ArrayList<Turn> possibleTurns = generatePossibleTurns(p);
-            Turn turn = p.fetchTurn(possibleTurns);
+            Turn turn = p.fetchTurn(possibleTurns, this);
             System.out.println((player) ? "Player1 Turn:" : "Player0 Turn:");
             turn.print();
             executeTurn(turn, p);
@@ -112,26 +113,63 @@ public class Game {
         }
     }
 
+    double evaluate() {
+        double score = 0;
+        int over = isGameOver();
+        if (over != 2) {
+            if (over == -1) return 0;
+            if (over == 0) return 99999;
+            if (over == 1) return -99999;
+        }
+        for (Piece piece: player0.getPieces()) {
+            if (piece.getXPos() != -1) switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
+                case 1 -> score += 100;
+                case 0 -> score += 50;
+                case -1 -> score += 25;
+            }
+        }
+        for (Piece piece: player1.getPieces()) {
+            if (piece.getXPos() != -1) switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
+                case 1 -> score -= 100;
+                case 0 -> score -= 50;
+                case -1 -> score -= 25;
+            }
+        }
+        // TODO piece activity and spell tokens
+        return score;
+    }
+
     private int isGameOver() {
         // Win p0 = 0
         // Win p1 = 1
         // Draw = -1
         // game isn't over = 2
-        boolean isOnlyP0Spirit = false;
-        boolean isOnlyP1Spirit = false;
-        for(Piece piece: player0.getPieces()) {
+        boolean isOnlyP0Spirit = true;
+        boolean isOnlyP1Spirit = true;
+
+        for (Piece piece : player0.getPieces()) {
             if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
-                return 1;
+                return 1; // Player 1 wins
             }
-            isOnlyP0Spirit = piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1;
+            if (piece.getType() != PieceType.spirit && piece.getXPos() != -1) {
+                isOnlyP0Spirit = false; // Player 0 has other pieces on the board
+            }
         }
-        for(Piece piece: player1.getPieces()) {
+
+        for (Piece piece : player1.getPieces()) {
             if (piece.getType() == PieceType.spirit && piece.getXPos() == -1) {
-                return 0;
+                return 0; // Player 0 wins
             }
-            isOnlyP1Spirit = piece.getType() != PieceType.spirit && piece.getXPos() == -1 || piece.getType() == PieceType.spirit && piece.getXPos() != -1;
+            if (piece.getType() != PieceType.spirit && piece.getXPos() != -1) {
+                isOnlyP1Spirit = false; // Player 1 has other pieces on the board
+            }
         }
-        return (isOnlyP0Spirit && isOnlyP1Spirit) ? -1 : 2;
+
+        if (isOnlyP0Spirit && isOnlyP1Spirit) {
+            return -1; // Draw
+        }
+
+        return 2; // Game isn't over
     }
 
     public void executeTurn(Turn turn, Player player) {
@@ -702,7 +740,7 @@ public class Game {
 
             if (x >= 0 && x < 8 && y >= 0 && y < 8) {
                 Piece potentialGuard = board[x][y].getPiece();
-                if (potentialGuard != null && potentialGuard.getType() == PieceType.guard) {
+                if (potentialGuard != null && potentialGuard.getType() == PieceType.guard && potentialGuard.getPlayer() != board[attack.xFrom][attack.yFrom].getPiece().getPlayer()) {
                     int currentGuardDistance = Math.abs(x + y - 7);
                     int closestGuardDistance = closestGuard != null ? Math.abs(closestGuard.getXPos() + closestGuard.getYPos() - 7) : Integer.MAX_VALUE;
                     if (closestGuard == null || distance < minDistance || (distance == minDistance && currentGuardDistance < closestGuardDistance)) {
@@ -861,5 +899,141 @@ public class Game {
 
     public Player getPlayer(boolean player) {
         return (player) ? player1 : player0;
+    }
+
+    public Game copyGameState() {
+        Game gameState = new Game();
+
+        // Copy pieces for player 0
+        Piece[] player0Pieces = new Piece[10];
+        for (int i = 0; i < player0.getPieces().length; i++) {
+            Piece copiedPiece = getCopiedPiece(player0, i);
+            player0Pieces[i] = copiedPiece;
+        }
+        Player newPlayer0 = new Player(player0Pieces, player0.getIsHuman());
+        newPlayer0.setSpellTokens(player0.getSpellTokens());
+        gameState.player0 = newPlayer0;
+
+        // Copy pieces for player 1
+        Piece[] player1Pieces = new Piece[10];
+        for (int i = 0; i < player1.getPieces().length; i++) {
+            Piece copiedPiece = getCopiedPiece(player1, i);
+            player1Pieces[i] = copiedPiece;
+        }
+        Player newPlayer1 = new Player(player1Pieces, player1.getIsHuman());
+        newPlayer1.setSpellTokens(player1.getSpellTokens());
+        gameState.player1 = newPlayer1;
+
+        // All board tiles
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Tile tile = new Tile(board[x][y].getTerrain());
+                tile.setBlockedTimer(board[x][y].getBlockedTimer());
+                tile.setDeathTimer(board[x][y].getDeathTimer());
+
+                Piece originalPiece = board[x][y].getPiece();
+                if (originalPiece != null) {
+                    Piece copiedPiece;
+                    if (originalPiece.getPlayer()) {
+                        copiedPiece = findCopiedPiece(player1Pieces, originalPiece);
+                    } else {
+                        copiedPiece = findCopiedPiece(player0Pieces, originalPiece);
+                    }
+                    tile.setPiece(copiedPiece);
+                }
+
+                gameState.board[x][y] = tile;
+            }
+        }
+
+        // Current Turn
+        gameState.turnCounter = turnCounter;
+
+        return gameState;
+    }
+
+    private Piece getCopiedPiece(Player player, int i) {
+        Piece originalPiece = player.getPieces()[i];
+        Piece copiedPiece = new Piece(originalPiece.getType(), originalPiece.getPlayer());
+        copiedPiece.setPosition(originalPiece.getXPos(), originalPiece.getYPos());
+        copiedPiece.setHasMoved(originalPiece.hasMoved());
+        copiedPiece.setAttackProtectedTimer(originalPiece.getAttackProtectedTimer());
+        copiedPiece.setSpellProtectedTimer(originalPiece.getSpellProtectedTimer());
+        copiedPiece.setSpellReflectionTimer(originalPiece.getSpellReflectionTimer());
+        return copiedPiece;
+    }
+
+    private Piece findCopiedPiece(Piece[] pieces, Piece originalPiece) {
+        for (Piece piece : pieces) {
+            if (piece.getType() == originalPiece.getType() &&
+                    piece.getXPos() == originalPiece.getXPos() &&
+                    piece.getYPos() == originalPiece.getYPos()) {
+                return piece;
+            }
+        }
+        return null;
+    }
+
+    public void loadGameState(Game gameState) {
+        // Load player 0 pieces
+        Piece[] player0Pieces = gameState.player0.getPieces();
+        for (int i = 0; i < player0Pieces.length; i++) {
+            Piece loadedPiece = player0Pieces[i];
+            Piece originalPiece = player0.getPieces()[i];
+            originalPiece.setPosition(loadedPiece.getXPos(), loadedPiece.getYPos());
+            originalPiece.setHasMoved(loadedPiece.hasMoved());
+            originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
+            originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
+            originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
+        }
+        player0.setSpellTokens(gameState.player0.getSpellTokens());
+
+        // Load player 1 pieces
+        Piece[] player1Pieces = gameState.player1.getPieces();
+        for (int i = 0; i < player1Pieces.length; i++) {
+            Piece loadedPiece = player1Pieces[i];
+            Piece originalPiece = player1.getPieces()[i];
+            originalPiece.setPosition(loadedPiece.getXPos(), loadedPiece.getYPos());
+            originalPiece.setHasMoved(loadedPiece.hasMoved());
+            originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
+            originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
+            originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
+        }
+        player1.setSpellTokens(gameState.player1.getSpellTokens());
+
+        // Load board tiles
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Tile tile = board[x][y];
+                Tile loadedTile = gameState.board[x][y];
+
+                tile.setBlockedTimer(loadedTile.getBlockedTimer());
+                tile.setDeathTimer(loadedTile.getDeathTimer());
+
+                Piece loadedPiece = loadedTile.getPiece();
+                if (loadedPiece != null) {
+                    Piece originalPiece;
+                    if (loadedPiece.getPlayer()) {
+                        originalPiece = findCopiedPiece(player1.getPieces(), loadedPiece);
+                    } else {
+                        originalPiece = findCopiedPiece(player0.getPieces(), loadedPiece);
+                    }
+                    tile.setPiece(originalPiece);
+                } else {
+                    tile.setPiece(null);
+                }
+            }
+        }
+
+        // Load current turn counter
+        this.turnCounter = gameState.turnCounter;
+    }
+
+    public double getTurnCounter() {
+        return turnCounter;
+    }
+
+    public void setTurnCounter(double turnCounter) {
+        this.turnCounter = turnCounter;
     }
 }
