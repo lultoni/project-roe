@@ -135,7 +135,7 @@ public class Game {
                 case -1 -> score -= 25;
             }
         }
-        // TODO piece activity and spell tokens
+        // TODO piece activity, spell tokens, guards blocking attacks (or spells)
         return score;
     }
 
