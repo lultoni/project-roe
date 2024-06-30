@@ -1,4 +1,3 @@
-import java.time.Period;
 import java.util.ArrayList;
 
 public class Game {
@@ -6,6 +5,7 @@ public class Game {
     private Player player0;
     private Player player1;
     private double turnCounter;
+    private SpellData[] spellData;
 
     public Game() {
         board = new Tile[8][8];
@@ -38,6 +38,23 @@ public class Game {
         setPiecesStart();
 
         turnCounter = 1;
+
+        spellData = new SpellData[15];
+        spellData[0] = new SpellData(3, "Fireball", "Kill the target, give space Inferno effect for 1 turn.", SpellType.offense, PieceType.fire);
+        spellData[1] = new SpellData(2, "Icy Spear", "Kill the target.", SpellType.offense, PieceType.water);
+        spellData[2] = new SpellData(3, "Rock Slide", "Kill the target and make space unavailable for two turns.", SpellType.offense, PieceType.earth);
+        spellData[3] = new SpellData(3, "Gale Force", "Kill the target and push back surrounding pieces by one.", SpellType.offense, PieceType.air);
+        spellData[4] = new SpellData(3, "Soul Siphon", "Kill the target and take one spell token from the opponent if they have at least 1 token.", SpellType.offense, PieceType.spirit);
+        spellData[5] = new SpellData(2, "Blazing Barrier", "Immune to attacks (not spells) for one turn.", SpellType.defense, PieceType.fire);
+        spellData[6] = new SpellData(2, "Aqua Shield", "Immune to spells for one turn.", SpellType.defense, PieceType.water);
+        spellData[7] = new SpellData(2, "Stone Wall", "Immune to spells for one turn.", SpellType.defense, PieceType.earth);
+        spellData[8] = new SpellData(2, "Areal Shield", "Apply spell cast on mage on attacker as well, lasts for one turn.", SpellType.defense, PieceType.air);
+        spellData[9] = new SpellData(2, "Ethereal Shield", "Immune to spells for one turn.", SpellType.defense, PieceType.spirit);
+        spellData[10] = new SpellData(3, "Inferno", "3 by 1 Area in which every piece dies that passes through, can’t be cast on full squares, lasts for two turns.", SpellType.utility, PieceType.fire);
+        spellData[11] = new SpellData(3, "Tidal Surge", "Push back all pieces from range plus 2 by two spaces.", SpellType.utility, PieceType.water);
+        spellData[12] = new SpellData(4, "Overgrown", "2 by 2 area make pieces skip turn (Range + 1).", SpellType.utility, PieceType.earth);
+        spellData[13] = new SpellData(2, "Zephyr Step", "Move to an adjacent tile.", SpellType.utility, PieceType.air);
+        spellData[14] = new SpellData(4, "Soul Swap", "Switch two of your own pieces.", SpellType.utility, PieceType.spirit);
     }
 
     private void loadMap(String mapFEN) {
@@ -104,6 +121,7 @@ public class Game {
             turn.print();
             executeTurn(turn, p);
             player = !player;
+            p.setSpellTokens(p.getSpellTokens() + getSpellTokenChange());
             if(isGameOver() != 2) printBoardPieces();
         }
         switch (isGameOver()) {
@@ -111,6 +129,11 @@ public class Game {
             case 0 -> System.out.println("Win for p0");
             case 1 -> System.out.println("Win for p1");
         }
+    }
+
+    private int getSpellTokenChange() {
+        int currentTurnGroup = (int) (turnCounter / 5);
+        return 1 + currentTurnGroup;
     }
 
     double evaluate() {
@@ -180,10 +203,25 @@ public class Game {
         updateTimers();
         doAttack(turn.attack);
         if (turn.spells != null) for (TurnSpell spell: turn.spells) {
-            // TODO castSpell(spell) with effects and taking st of player
+            castSpell(spell, player);
         }
         updateTimers();
         turnCounter += 0.5;
+    }
+
+    private void castSpell(TurnSpell spell, Player player) {
+        if (spell != null) {
+            if (!isLegalSpell(spell)) throw new IllegalArgumentException("The Spell that was provided is not Legal.");
+            spellData[spell.spellDataIndex].castEffect(spell);
+        }
+    }
+
+    private boolean isLegalSpell(TurnSpell spell) {
+        // TODO spell tokens can cast
+        // offense: isPathFree, isTargetSingle, isTargetPieceCorrect
+        // defense: ?
+        // utility: ?
+        return true;
     }
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
@@ -550,12 +588,25 @@ public class Game {
 
     public ArrayList<ArrayList<TurnSpell>> generatePossibleSpellCombinations(Player player) {
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = new ArrayList<>();
+        for (int i = 0; i < getSpellAmount(); i++) {
+            // TODO in which order you want to add spells (these two for loops)
+        }
+        for (SpellData spell: spellData) {
+
+        }
+
         // TODO generate all possible spell combinations
         // no empty spell combination, as that is handled in turn generation
         // -> for number of allowed spells (i = 1; i <= maxSpells; i++), look if every spell is legal
         // if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue; (if mage is taken or is guard, skip)
         return possibleSpellCombinations;
     }
+
+    private int getSpellAmount() {
+        int currentTurnGroup = (int) (turnCounter / 10);
+        return 2 + currentTurnGroup;
+    }
+
 
     private void updateTimers() {
         for (int y = 0; y < 8; y++) {
@@ -589,7 +640,7 @@ public class Game {
             if (piece.getXPos() == -1) continue;
             int xPos = piece.getXPos();
             int yPos = piece.getYPos();
-            int range = getRange(xPos, yPos);
+            int range = getMovementRange(xPos, yPos);
 
             for (int xChange = -range; xChange <= range; xChange++) {
                 for (int yChange = -range; yChange <= range; yChange++) {
@@ -635,8 +686,13 @@ public class Game {
         return possibleAttacks;
     }
 
-    private int getRange(int xPos, int yPos) {
+    private int getMovementRange(int xPos, int yPos) {
         return (pieceTerrainAdvantage(xPos, yPos) == 1) ? 2 : 1;
+    }
+
+    private int getSpellRange(int xPos, int yPos) {
+        int advantage = pieceTerrainAdvantage(xPos, yPos);
+        return (advantage == 1) ? 3 : (advantage == 0) ? 2 : 1;
     }
 
     public void doMove(Move move, boolean debug) {
@@ -753,8 +809,8 @@ public class Game {
         return closestGuard;
     }
 
-    private boolean isLegalAttack(Attack attack) {
-        int range = getRange(attack.xFrom, attack.yFrom);
+    private boolean isLegalAttack(Attack attack) { // TODO spell effects need to be considered
+        int range = getMovementRange(attack.xFrom, attack.yFrom);
         if (range == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 0 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 0) {
             Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
             Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
@@ -763,9 +819,9 @@ public class Game {
         return false;
     }
 
-    private boolean isLegalMove(Move move, boolean debug) { // TODO better error throw messages
+    private boolean isLegalMove(Move move, boolean debug) { // TODO spell effects need to be considered
         if (board[move.xFrom][move.yFrom].getPiece().hasMoved() && !debug) return false;
-        int range = getRange(move.xFrom, move.yFrom);
+        int range = getMovementRange(move.xFrom, move.yFrom);
         if (range == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 0 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 0) {
             return board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null;
         } else {

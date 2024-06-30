@@ -39,7 +39,7 @@ public class Player {
             String attackStr = scanner.nextLine();
             Attack attack = parseAttack(attackStr);
 
-            // Spells are null for now
+            // TODO Spells are null for now
             return new Turn(move1, move2, move3, attack, null);
         } else {
             double bestScore = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
