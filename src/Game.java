@@ -145,22 +145,61 @@ public class Game {
             if (over == 1) return -99999;
         }
         for (Piece piece: player0.getPieces()) {
-            if (piece.getXPos() != -1) switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
-                case 1 -> score += 100;
-                case 0 -> score += 50;
-                case -1 -> score += 25;
+            if (piece.getXPos() != -1) {
+                switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
+                    case 1 -> score += 100;
+                    case 0 -> score += 50;
+                    case -1 -> score += 25;
+                }
+                score += getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
+                score += player0.getSpellTokens() * 20;
+                boolean isGuardProtected = false;
+                for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
+                    if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
+                        isGuardProtected = true;
+                        break;
+                    }
+                }
+                if (isGuardProtected) score += 20;
             }
         }
         for (Piece piece: player1.getPieces()) {
-            if (piece.getXPos() != -1) switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
-                case 1 -> score -= 100;
-                case 0 -> score -= 50;
-                case -1 -> score -= 25;
+            if (piece.getXPos() != -1) {
+                switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
+                    case 1 -> score -= 100;
+                    case 0 -> score -= 50;
+                    case -1 -> score -= 25;
+                }
+                score -= getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
+                score -= player1.getSpellTokens() * 20;
+                boolean isGuardProtected = false;
+                for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
+                    if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
+                        isGuardProtected = true;
+                        break;
+                    }
+                }
+                if (isGuardProtected) score -= 20;
             }
         }
-        // TODO piece activity, spell tokens, guards blocking attacks (or spells)
         return score;
     }
+
+    private ArrayList<Tile> getTilesInRange(int xPos, int yPos, int range) {
+        ArrayList<Tile> tilesInRange = new ArrayList<>();
+
+        for (int x = Math.max(0, xPos - range); x <= Math.min(board.length - 1, xPos + range); x++) {
+            for (int y = Math.max(0, yPos - range); y <= Math.min(board[0].length - 1, yPos + range); y++) {
+                if (x == xPos && y == yPos) {
+                    continue; // Skip the tile at (xPos, yPos)
+                }
+                tilesInRange.add(board[x][y]);
+            }
+        }
+
+        return tilesInRange;
+    }
+
 
     private int isGameOver() {
         // Win p0 = 0
@@ -211,17 +250,89 @@ public class Game {
 
     private void castSpell(TurnSpell spell, Player player) {
         if (spell != null) {
-            if (!isLegalSpell(spell)) throw new IllegalArgumentException("The Spell that was provided is not Legal.");
+            if (!isLegalSpell(spell, player)) throw new IllegalArgumentException("The Spell that was provided is not Legal.");
             spellData[spell.spellDataIndex].castEffect(spell);
         }
     }
 
-    private boolean isLegalSpell(TurnSpell spell) {
-        // TODO spell tokens can cast
-        // offense: isPathFree, isTargetSingle, isTargetPieceCorrect
-        // defense: ?
-        // utility: ?
-        return true;
+    private boolean isLegalSpell(TurnSpell spell, Player player) {
+        SpellData dataOfSpell = spellData[spell.spellDataIndex];
+        Piece mage = board[spell.xFrom][spell.yFrom].getPiece();
+        if (player.getSpellTokens() < dataOfSpell.cost) return false;
+        if (mage == null) {
+            return false;
+        } else {
+            if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType) return false;
+        }
+        switch (dataOfSpell.spellType) {
+            case offense -> {
+                int[] target = spell.targets.getFirst();
+                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() != mage.getPlayer() && isSpellPathFree(spell);
+            }
+            // defense: isTargetPieceCorrect
+            case defense -> {
+                return false;
+            }
+            // utility: f((isTargetTripleAdjacent), isTargetEmpty), w(), e((isTarget2x2Square)), a(isTargetAdjacentToMage, isTargetEmpty), s(areTwoTargets, areTargetPiecesCorrect)
+            case utility -> {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean isSpellPathFree(TurnSpell spell) {
+        int xFrom = spell.xFrom;
+        int yFrom = spell.yFrom;
+        int xTo = spell.targets.getFirst()[0];
+        int yTo = spell.targets.getFirst()[1];
+        int xChange = xFrom - xTo;
+        int yChange = yFrom - yTo;
+        int absXChange = Math.abs(xChange);
+        int absYChange = Math.abs(yChange);
+        int signXChange = (int) Math.signum(xChange);
+        int signYChange = (int) Math.signum(yChange);
+
+        // Range 1
+        if (absXChange <= 1 && absYChange <= 1) return true;
+
+        // Range 2
+        if (absXChange <= 2 && absYChange <= 2) {
+            if (absXChange == 2 && absYChange == 2) {
+                Piece potentialGuard = board[signXChange + xFrom][signYChange + yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard, xFrom, yFrom);
+            } else if (absYChange == 2) {
+                Piece potentialGuard = board[xFrom][signYChange + yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard, xFrom, yFrom);
+            } else {
+                Piece potentialGuard = board[signXChange + xFrom][yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard, xFrom, yFrom);
+            }
+        }
+
+        // Range 3
+        if (absXChange <= 3 && absYChange <= 3) {
+            if (absXChange == 3 && absYChange == 3 || absXChange == 3 && absYChange == 2 || absXChange == 2) {
+                Piece potentialGuard1 = board[signXChange + xFrom][signYChange + yFrom].getPiece();
+                Piece potentialGuard2 = board[2 * signXChange + xFrom][2 * signYChange + yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
+            } else if (absXChange == 0 || absXChange == 1) {
+                Piece potentialGuard1 = board[xFrom][signYChange + yFrom].getPiece();
+                Piece potentialGuard2 = board[xFrom][2 * signYChange + yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
+            } else if ((absXChange == 3 && absYChange == 0) || (absXChange == 3 && absYChange == 1)) {
+                Piece potentialGuard1 = board[signXChange + xFrom][yFrom].getPiece();
+                Piece potentialGuard2 = board[2 * signXChange + xFrom][yFrom].getPiece();
+                return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
+            }
+        }
+
+        // Not in the range of the mage
+        return false;
+    }
+
+    private boolean checkPotentialGuard(Piece potentialGuard, int xFrom, int yFrom) {
+        return potentialGuard == null || potentialGuard.getType() != PieceType.guard || potentialGuard.getPlayer() != board[xFrom][yFrom].getPiece().getPlayer();
     }
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
