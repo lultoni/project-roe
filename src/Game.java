@@ -769,19 +769,27 @@ public class Game {
         ArrayList<TurnSpell> allVariations;
         for (int spellIndex = 0; spellIndex < spellData.length; spellIndex++) {
             SpellData dataOfSpell = spellData[spellIndex];
-            for (Piece piece: player.getPieces()) {
+            for (Piece piece : player.getPieces()) {
                 if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue;
                 if (dataOfSpell.mageType == piece.getType() && dataOfSpell.cost <= availableTokens) {
                     TurnSpell baseVariation = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
                     allVariations = generateVariations(baseVariation);
-                    possibleSpellCombinations.add(allVariations);
-                    if (maxSpells > 0) for (TurnSpell variation: allVariations) {
-                        Game gameState = copyGameState();
-                        castSpell(variation, player);
-                        generateSpellCombo(player, maxSpells-1, possibleSpellCombinations);
-                        loadGameState(gameState);
+                    allVariations.removeIf(variation -> variation.targets.isEmpty());
+
+                    for (TurnSpell variation : allVariations) {
+                        ArrayList<TurnSpell> singleSpellCombination = new ArrayList<>();
+                        singleSpellCombination.add(variation);
+                        possibleSpellCombinations.add(singleSpellCombination);
                     }
 
+                    if (maxSpells > 1) {
+                        for (TurnSpell variation : allVariations) {
+                            Game gameState = copyGameState();
+                            castSpell(variation, player);
+                            generateSpellCombo(player, maxSpells - 1, possibleSpellCombinations);
+                            loadGameState(gameState);
+                        }
+                    }
                 }
             }
         }
