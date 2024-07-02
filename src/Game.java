@@ -200,6 +200,21 @@ public class Game {
         return tilesInRange;
     }
 
+    private ArrayList<int[]> getTilePositionsInRange(int xPos, int yPos, int range) {
+        ArrayList<int[]> tilePositionsInRange = new ArrayList<>();
+
+        for (int x = Math.max(0, xPos - range); x <= Math.min(board.length - 1, xPos + range); x++) {
+            for (int y = Math.max(0, yPos - range); y <= Math.min(board[0].length - 1, yPos + range); y++) {
+                if (x == xPos && y == yPos) {
+                    continue; // Skip the tile at (xPos, yPos)
+                }
+                tilePositionsInRange.add(new int[]{x, y});
+            }
+        }
+
+        return tilePositionsInRange;
+    }
+
 
     private int isGameOver() {
         // Win p0 = 0
@@ -742,45 +757,170 @@ public class Game {
     public ArrayList<ArrayList<TurnSpell>> generatePossibleSpellCombinations(Player player) {
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = new ArrayList<>();
         int maxSpells = getSpellAmount();
-        int availableTokens = player.getSpellTokens();
 
-        // Generate all possible spells
-        ArrayList<TurnSpell> allPossibleSpells = new ArrayList<>();
-        for (int spellIndex = 0; spellIndex < spellData.length; spellIndex++) {
-            SpellData spell = spellData[spellIndex];
-            for (Piece piece : player.getPieces()) {
-                if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue;
-                if (spell.mageType == piece.getType() && spell.cost <= availableTokens) {
-                    TurnSpell turnSpell = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
-                    if (isLegalSpell(turnSpell, player)) {
-                        allPossibleSpells.add(turnSpell);
-                    }
-                }
-            }
-        }
-
-        // Generate all possible combinations of spells up to maxSpells
-        generateSpellCombinations(allPossibleSpells, new ArrayList<>(), possibleSpellCombinations, maxSpells, availableTokens);
+        generateSpellCombo(player, maxSpells, possibleSpellCombinations);
 
         return possibleSpellCombinations;
     }
 
-    private void generateSpellCombinations(ArrayList<TurnSpell> allSpells, ArrayList<TurnSpell> currentCombination, ArrayList<ArrayList<TurnSpell>> allCombinations, int remainingSpells, int remainingTokens) {
-        if (remainingSpells == 0 || allSpells.isEmpty()) {
-            if (!currentCombination.isEmpty()) {
-                allCombinations.add(new ArrayList<>(currentCombination));
-            }
-            return;
-        }
+    private void generateSpellCombo(Player player, int maxSpells, ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations) {
+        int availableTokens = player.getSpellTokens();
 
-        for (int i = 0; i < allSpells.size(); i++) {
-            TurnSpell spell = allSpells.get(i);
-            if (spellData[spell.spellDataIndex].cost <= remainingTokens) {
-                currentCombination.add(spell);
-                generateSpellCombinations(new ArrayList<>(allSpells.subList(i + 1, allSpells.size())), currentCombination, allCombinations, remainingSpells - 1, remainingTokens - spellData[spell.spellDataIndex].cost);
-                currentCombination.removeLast();
+        ArrayList<TurnSpell> allVariations;
+        for (int spellIndex = 0; spellIndex < spellData.length; spellIndex++) {
+            SpellData dataOfSpell = spellData[spellIndex];
+            for (Piece piece: player.getPieces()) {
+                if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue;
+                if (dataOfSpell.mageType == piece.getType() && dataOfSpell.cost <= availableTokens) {
+                    TurnSpell baseVariation = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
+                    allVariations = generateVariations(baseVariation);
+                    possibleSpellCombinations.add(allVariations);
+                    if (maxSpells > 0) for (TurnSpell variation: allVariations) {
+                        Game gameState = copyGameState();
+                        castSpell(variation, player);
+                        generateSpellCombo(player, maxSpells-1, possibleSpellCombinations);
+                        loadGameState(gameState);
+                    }
+
+                }
             }
         }
+    }
+
+    private ArrayList<TurnSpell> generateVariations(TurnSpell baseVariation) {
+        ArrayList<TurnSpell> allVariations = new ArrayList<>();
+        SpellData dataOfSpell = spellData[baseVariation.spellDataIndex];
+        switch (dataOfSpell.spellType) {
+            case offense -> {
+                for (int[] tilePosition: getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
+                    Tile tile = board[tilePosition[0]][tilePosition[1]];
+                    if (tile.getPiece() == null || tile.getPiece().getPlayer() == board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()) continue;
+                    ArrayList<int[]> targets = new ArrayList<>();
+                    targets.add(new int[]{tilePosition[0], tilePosition[1]});
+                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                    if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
+                }
+            }
+            case defense -> {
+                for (int[] tilePosition: getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
+                    Tile tile = board[tilePosition[0]][tilePosition[1]];
+                    if (tile.getPiece() == null || tile.getPiece().getPlayer() != board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer() || tile.getPiece().getType() != PieceType.guard) continue;
+                    ArrayList<int[]> targets = new ArrayList<>();
+                    targets.add(new int[]{tilePosition[0], tilePosition[1]});
+                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                    if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
+                }
+            }
+            case utility -> {
+                switch (dataOfSpell.mageType) {
+                    case fire -> {
+                        // Horizontal 3x1
+                        for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
+                            int x = tilePosition[0];
+                            int y = tilePosition[1];
+                            if (x + 2 <= 7) {
+                                Tile tile1 = board[x][y];
+                                Tile tile2 = board[x + 1][y];
+                                Tile tile3 = board[x + 2][y];
+                                if (tile1.getPiece() == null && tile2.getPiece() == null && tile3.getPiece() == null) {
+                                    ArrayList<int[]> targets = new ArrayList<>();
+                                    targets.add(new int[]{x, y});
+                                    targets.add(new int[]{x + 1, y});
+                                    targets.add(new int[]{x + 2, y});
+                                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                    if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
+                                        allVariations.add(variation);
+                                    }
+                                }
+                            }
+                        }
+                        // Vertical 1x3
+                        for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
+                            int x = tilePosition[0];
+                            int y = tilePosition[1];
+                            if (y + 2 <= 7) {
+                                Tile tile1 = board[x][y];
+                                Tile tile2 = board[x][y + 1];
+                                Tile tile3 = board[x][y + 2];
+                                if (tile1.getPiece() == null && tile2.getPiece() == null && tile3.getPiece() == null) {
+                                    ArrayList<int[]> targets = new ArrayList<>();
+                                    targets.add(new int[]{x, y});
+                                    targets.add(new int[]{x, y + 1});
+                                    targets.add(new int[]{x, y + 2});
+                                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                    if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
+                                        allVariations.add(variation);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    case water -> {
+                        ArrayList<int[]> targets = new ArrayList<>();
+                        for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom) + 2)) {
+                            int x = tilePosition[0];
+                            int y = tilePosition[1];
+                            Piece piece = board[x][y].getPiece();
+                            if (piece != null && piece.getPlayer() == board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()) { // TODO spell effect?
+                                targets.add(new int[]{x, y});
+                            }
+                        }
+                        TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                        if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
+                            allVariations.add(variation);
+                        }
+                    }
+                    case earth -> {
+                        for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom) + 1)) {
+                            int x = tilePosition[0];
+                            int y = tilePosition[1];
+                            if (x + 1 <= 7 && y + 1 <= 7) {
+                                ArrayList<int[]> targets = new ArrayList<>();
+                                targets.add(new int[]{x, y});
+                                targets.add(new int[]{x + 1, y});
+                                targets.add(new int[]{x, y + 1});
+                                targets.add(new int[]{x + 1, y + 1});
+                                TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
+                                    allVariations.add(variation);
+                                }
+                            }
+                        }
+                    }
+                    case air -> {
+                        for (int[] tilePosition: getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, 1)) {
+                            Tile tile = board[tilePosition[0]][tilePosition[1]];
+                            if (tile.getPiece() != null) continue;
+                            ArrayList<int[]> targets = new ArrayList<>();
+                            targets.add(new int[]{tilePosition[0], tilePosition[1]});
+                            TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                            if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
+                        }
+                    }
+                    case spirit -> {
+                        Player player = getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer());
+                        ArrayList<int[]> playerPieces = new ArrayList<>();
+                        for (Piece piece : player.getPieces()) {
+                            if (piece.getXPos() != -1) {
+                                playerPieces.add(new int[]{piece.getXPos(), piece.getYPos()});
+                            }
+                        }
+                        for (int i = 0; i < playerPieces.size(); i++) {
+                            for (int j = i + 1; j < playerPieces.size(); j++) {
+                                ArrayList<int[]> targets = new ArrayList<>();
+                                targets.add(playerPieces.get(i));
+                                targets.add(playerPieces.get(j));
+                                TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                if (isLegalSpell(variation, player)) {
+                                    allVariations.add(variation);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return allVariations;
     }
 
     private int getSpellAmount() {
