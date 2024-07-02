@@ -6,7 +6,7 @@ public class Piece {
     private double spellProtectedTimer;
     private double spellReflectionTimer;
     private double attackProtectedTimer;
-    private double overgrownTimer; // TODO updateTimer, legal everything, get-set, copy game
+    private double overgrownTimer; // TODO updateTimer, legal attack/movement, copy game
     private boolean hasMoved;
 
     public Piece(PieceType type, boolean player) {
@@ -71,5 +71,13 @@ public class Piece {
 
     public void setSpellReflectionTimer(double spellReflectionTimer) {
         this.spellReflectionTimer = spellReflectionTimer;
+    }
+
+    public double getOvergrownTimer() {
+        return overgrownTimer;
+    }
+
+    public void setOvergrownTimer(double overgrownTimer) {
+        this.overgrownTimer = overgrownTimer;
     }
 }

@@ -1,7 +1,5 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 public class Game {
     private final Tile[][] board;
@@ -269,18 +267,18 @@ public class Game {
     private void castSpell(TurnSpell spell, Player player) {
         if (spell != null) {
             if (!isLegalSpell(spell, player)) throw new IllegalArgumentException("The Spell that was provided is not Legal.");
-            spellData[spell.spellDataIndex].castEffect(spell);
+            spellData[spell.spellDataIndex].castEffect(spell, player, board, getPlayer(!board[spell.xFrom][spell.yFrom].getPiece().getPlayer()));
         }
     }
 
-    private boolean isLegalSpell(TurnSpell spell, Player player) { // TODO spell effects need to be considered
+    private boolean isLegalSpell(TurnSpell spell, Player player) {
         SpellData dataOfSpell = spellData[spell.spellDataIndex];
         Piece mage = board[spell.xFrom][spell.yFrom].getPiece();
         if (player.getSpellTokens() < dataOfSpell.cost) return false;
         if (mage == null) {
             return false;
         } else {
-            if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType) return false;
+            if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType || mage.getOvergrownTimer() > 0) return false;
         }
         switch (dataOfSpell.spellType) {
             case offense -> {
@@ -350,8 +348,8 @@ public class Game {
         int yFrom = spell.yFrom;
         int xTo = spell.targets.getFirst()[0];
         int yTo = spell.targets.getFirst()[1];
-        int xChange = xFrom - xTo;
-        int yChange = yFrom - yTo;
+        int xChange = xTo - xFrom;
+        int yChange = yTo - yFrom;
         int absXChange = Math.abs(xChange);
         int absYChange = Math.abs(yChange);
         int signXChange = (int) Math.signum(xChange);
@@ -429,9 +427,13 @@ public class Game {
         // x a s
         position = fetchPositionPieces();
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
+            Piece piece = storePieceOfAttack(attack);
+            Object[] guardPosition = doAttack(attack);
+            possibleSpellCombinations = generatePossibleSpellCombinations(player);
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
                 if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(null, null, null, attack, spells));
             }
+            undoAttack(attack, piece, guardPosition);
         }
         tempSize = logAndResetState("x a s", tempSize, player, possibleTurns, position);
 
@@ -673,40 +675,35 @@ public class Game {
         setPiecesPosition(position);
         resetHasMoved(player);
         System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
-        if (text.contains("s") && (possibleTurns.size() - tempSize) > 0) {
-            Map<String, Integer> spellSequenceCount = new HashMap<>();
-            Map<String, Integer> spellCastCount = new HashMap<>();
-            for (Turn turn : possibleTurns.subList(tempSize, possibleTurns.size())) {
-                StringBuilder sequence = new StringBuilder();
-                for (TurnSpell spell : turn.spells) {
-                    sequence.append(spellData[spell.spellDataIndex].spellType.name().charAt(0));
-                    String spellKey = spellData[spell.spellDataIndex].spellType.name().charAt(0) +
-                            spellData[spell.spellDataIndex].mageType.name().substring(0, 1).toLowerCase();
-                    spellCastCount.put(spellKey, spellCastCount.getOrDefault(spellKey, 0) + 1);
-                }
-                String sequenceString = sequence.toString();
-                spellSequenceCount.put(sequenceString, spellSequenceCount.getOrDefault(sequenceString, 0) + 1);
-            }
-            System.out.println("Spell Sequence Counts:");
-            for (Map.Entry<String, Integer> entry : spellSequenceCount.entrySet()) {
-                System.out.println(entry.getKey() + ": " + entry.getValue());
-            }
-            System.out.println("Spell Cast Count:");
-            for (SpellType spellType : SpellType.values()) {
-                for (PieceType mageType : PieceType.values()) {
-                    if (mageType == PieceType.guard) continue;
-                    String spellKey = spellType.name().charAt(0) + mageType.name().substring(0, 1).toLowerCase();
-                    int count = spellCastCount.getOrDefault(spellKey, 0);
-                    if (count > 0) System.out.println(spellKey + ": " + count);
-                }
-            }
-            spellSequenceCount.clear(); // TODO actually clear the counting things... like why tf they ain't doing it
-            spellCastCount.clear();
-        }
+//        if (text.contains("s") && (possibleTurns.size() - tempSize) > 0) {
+//            Map<String, Integer> spellSequenceCount = new HashMap<>();
+//            Map<String, Integer> spellCastCount = new HashMap<>();
+//            for (Turn turn : possibleTurns.subList(tempSize, possibleTurns.size())) {
+//                String sequence = "";
+//                for (TurnSpell spell : turn.spells) {
+//                    sequence += (spellData[spell.spellDataIndex].spellType.name().charAt(0));
+//                    String spellKey = spellData[spell.spellDataIndex].spellType.name().charAt(0) + spellData[spell.spellDataIndex].mageType.name().substring(0, 1).toLowerCase();
+//                    spellCastCount.put(spellKey, spellCastCount.getOrDefault(spellKey, 0) + 1);
+//                }
+//                spellSequenceCount.put(sequence, spellSequenceCount.getOrDefault(sequence, 0) + 1);
+//            }
+//            System.out.println("Spell Sequence Counts:");
+//            for (Map.Entry<String, Integer> entry : spellSequenceCount.entrySet()) {
+//                System.out.println(entry.getKey() + ": " + entry.getValue());
+//            }
+//            System.out.println("Spell Cast Count:");
+//            for (SpellType spellType : SpellType.values()) {
+//                for (PieceType mageType : PieceType.values()) {
+//                    if (mageType == PieceType.guard) continue;
+//                    String spellKey = spellType.name().charAt(0) + mageType.name().substring(0, 1).toLowerCase();
+//                    int count = spellCastCount.getOrDefault(spellKey, 0);
+//                    if (count > 0) System.out.println(spellKey + ": " + count);
+//                }
+//            }
+//        }
 
         return possibleTurns.size();
     }
-
     private void setPiecesPosition(int[][] position) {
         Piece[] p0p = player0.getPieces();
         Piece[] p1p = player1.getPieces();
@@ -815,13 +812,12 @@ public class Game {
                     allVariations = generateVariations(baseVariation);
                     allVariations.removeIf(variation -> variation.targets.isEmpty());
 
-                    for (TurnSpell variation : allVariations) { // TODO also add singular combo, not only with all the spells inside
+                    for (TurnSpell variation : allVariations) {
                         ArrayList<TurnSpell> newCombination = new ArrayList<>(currentCombination);
                         newCombination.add(variation);
 
-                        if (maxSpells == 1) {
-                            possibleSpellCombinations.add(newCombination);
-                        } else {
+                        possibleSpellCombinations.add(newCombination);
+                        if (maxSpells > 1) {
                             Game gameState = copyGameState();
                             castSpell(variation, player);
                             generateSpellCombo(player, maxSpells - 1, possibleSpellCombinations, newCombination);
@@ -909,7 +905,7 @@ public class Game {
                             int x = tilePosition[0];
                             int y = tilePosition[1];
                             Piece piece = board[x][y].getPiece();
-                            if (piece != null && piece.getPlayer() == board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()) { // TODO spell effect?
+                            if (piece != null && piece.getPlayer() != board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer() && piece.getSpellProtectedTimer() == 0) {
                                 targets.add(new int[]{x, y});
                             }
                         }
@@ -955,7 +951,7 @@ public class Game {
                             if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
                         }
                     }
-                    case spirit -> { // TODO check if working as intended
+                    case spirit -> {
                         Player player = getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer());
                         ArrayList<int[]> playerPieces = new ArrayList<>();
                         for (Piece piece : player.getPieces()) {
@@ -969,9 +965,12 @@ public class Game {
                                 int[] piece2 = playerPieces.get(j);
                                 boolean existsInverse = false;
                                 for (TurnSpell existingVariation : allVariations) {
-                                    if (existingVariation.targets.size() == 2 &&
-                                            Arrays.equals(existingVariation.targets.get(0), piece2) &&
-                                            Arrays.equals(existingVariation.targets.get(1), piece1)) {
+                                    if (spellData[existingVariation.spellDataIndex].name.equals(dataOfSpell.name) &&
+                                            existingVariation.targets.size() == 2 &&
+                                            (Arrays.equals(existingVariation.targets.get(0), piece2) &&
+                                            Arrays.equals(existingVariation.targets.get(1), piece1)) ||
+                                            (Arrays.equals(existingVariation.targets.get(1), piece2) &&
+                                            Arrays.equals(existingVariation.targets.get(0), piece1))) {
                                         existsInverse = true;
                                         break;
                                     }
@@ -1026,7 +1025,7 @@ public class Game {
         }
     }
 
-    public ArrayList<Move> generatePossibleMoves(Player player) {
+    public ArrayList<Move> generatePossibleMoves(Player player) { // TODO inferno and rock slide status
         ArrayList<Move> possibleMoves = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
             if (piece.getXPos() == -1) continue;
