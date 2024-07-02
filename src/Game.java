@@ -255,7 +255,7 @@ public class Game {
         }
     }
 
-    private boolean isLegalSpell(TurnSpell spell, Player player) {
+    private boolean isLegalSpell(TurnSpell spell, Player player) { // TODO spell effects need to be considered
         SpellData dataOfSpell = spellData[spell.spellDataIndex];
         Piece mage = board[spell.xFrom][spell.yFrom].getPiece();
         if (player.getSpellTokens() < dataOfSpell.cost) return false;
@@ -266,10 +266,12 @@ public class Game {
         }
         switch (dataOfSpell.spellType) {
             case offense -> {
+                if (spell.targets.isEmpty()) return false;
                 int[] target = spell.targets.getFirst();
                 return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() != mage.getPlayer() && isSpellPathFree(spell);
             }
             case defense -> {
+                if (spell.targets.isEmpty()) return false;
                 int[] target = spell.targets.getFirst();
                 return spell.targets.size() == 1  && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer();
             }
@@ -294,7 +296,8 @@ public class Game {
                     case earth -> {
                         // (1)(2)
                         // (3)(4)
-                        return (spell.targets.get(0)[0] == spell.targets.get(2)[0] &&
+                        return spell.targets.size() == 4 &&
+                                (spell.targets.get(0)[0] == spell.targets.get(2)[0] &&
                                 spell.targets.get(1)[0] == spell.targets.get(3)[0] &&
                                 spell.targets.get(0)[0] == spell.targets.get(1)[0] - 1 &&
                                 spell.targets.get(2)[0] == spell.targets.get(3)[0] - 1) &&
@@ -738,18 +741,46 @@ public class Game {
 
     public ArrayList<ArrayList<TurnSpell>> generatePossibleSpellCombinations(Player player) {
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = new ArrayList<>();
-        for (int i = 0; i < getSpellAmount(); i++) {
-            // TODO in which order you want to add spells (these two for loops)
-        }
-        for (SpellData spell: spellData) {
+        int maxSpells = getSpellAmount();
+        int availableTokens = player.getSpellTokens();
 
+        // Generate all possible spells
+        ArrayList<TurnSpell> allPossibleSpells = new ArrayList<>();
+        for (int spellIndex = 0; spellIndex < spellData.length; spellIndex++) {
+            SpellData spell = spellData[spellIndex];
+            for (Piece piece : player.getPieces()) {
+                if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue;
+                if (spell.mageType == piece.getType() && spell.cost <= availableTokens) {
+                    TurnSpell turnSpell = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
+                    if (isLegalSpell(turnSpell, player)) {
+                        allPossibleSpells.add(turnSpell);
+                    }
+                }
+            }
         }
 
-        // TODO generate all possible spell combinations
-        // no empty spell combination, as that is handled in turn generation
-        // -> for number of allowed spells (i = 1; i <= maxSpells; i++), look if every spell is legal
-        // if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue; (if mage is taken or is guard, skip)
+        // Generate all possible combinations of spells up to maxSpells
+        generateSpellCombinations(allPossibleSpells, new ArrayList<>(), possibleSpellCombinations, maxSpells, availableTokens);
+
         return possibleSpellCombinations;
+    }
+
+    private void generateSpellCombinations(ArrayList<TurnSpell> allSpells, ArrayList<TurnSpell> currentCombination, ArrayList<ArrayList<TurnSpell>> allCombinations, int remainingSpells, int remainingTokens) {
+        if (remainingSpells == 0 || allSpells.isEmpty()) {
+            if (!currentCombination.isEmpty()) {
+                allCombinations.add(new ArrayList<>(currentCombination));
+            }
+            return;
+        }
+
+        for (int i = 0; i < allSpells.size(); i++) {
+            TurnSpell spell = allSpells.get(i);
+            if (spellData[spell.spellDataIndex].cost <= remainingTokens) {
+                currentCombination.add(spell);
+                generateSpellCombinations(new ArrayList<>(allSpells.subList(i + 1, allSpells.size())), currentCombination, allCombinations, remainingSpells - 1, remainingTokens - spellData[spell.spellDataIndex].cost);
+                currentCombination.removeLast();
+            }
+        }
     }
 
     private int getSpellAmount() {
@@ -1241,5 +1272,9 @@ public class Game {
 
     public void setTurnCounter(double turnCounter) {
         this.turnCounter = turnCounter;
+    }
+
+    public SpellData[] getSpellData() {
+        return spellData;
     }
 }
