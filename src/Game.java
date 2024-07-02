@@ -1,15 +1,15 @@
 import java.util.ArrayList;
 
 public class Game {
-    private Tile[][] board;
+    private final Tile[][] board;
     private Player player0;
     private Player player1;
     private double turnCounter;
-    private SpellData[] spellData;
+    private final SpellData[] spellData;
 
     public Game() {
         board = new Tile[8][8];
-        loadMap("FPPP/FLLL/MLFP/MMMF");
+        loadMap();
 
         Piece[] p0p = new Piece[]{
                 new Piece(PieceType.fire, false),
@@ -57,8 +57,8 @@ public class Game {
         spellData[14] = new SpellData(4, "Soul Swap", "Switch two of your own pieces.", SpellType.utility, PieceType.spirit);
     }
 
-    private void loadMap(String mapFEN) {
-        String[] halves = mapFEN.split("/");
+    private void loadMap() {
+        String[] halves = "FPPP/FLLL/MLFP/MMMF".split("/");
         String fullMap = "";
 
         for (String lineSplit: halves) {
@@ -269,13 +269,52 @@ public class Game {
                 int[] target = spell.targets.getFirst();
                 return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() != mage.getPlayer() && isSpellPathFree(spell);
             }
-            // defense: isTargetPieceCorrect
             case defense -> {
-                return false;
+                int[] target = spell.targets.getFirst();
+                return spell.targets.size() == 1  && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer();
             }
-            // utility: f((isTargetTripleAdjacent), isTargetEmpty), w(), e((isTarget2x2Square)), a(isTargetAdjacentToMage, isTargetEmpty), s(areTwoTargets, areTargetPiecesCorrect)
             case utility -> {
-                return false;
+                switch (dataOfSpell.mageType) {
+                    case fire -> {
+                        // (1)(2)(3)
+                        // (2)
+                        // (3)
+                        return spell.targets.size() == 3 &&
+                                board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
+                                board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() == null &&
+                                board[spell.targets.get(2)[0]][spell.targets.get(2)[1]].getPiece() == null &&
+                                (((spell.targets.getFirst()[0] == spell.targets.get(1)[0]) && (spell.targets.getFirst()[0] == spell.targets.get(2)[0])) &&
+                                (spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 2)) &&
+                                (((spell.targets.getFirst()[1] == spell.targets.get(1)[1]) && (spell.targets.getFirst()[0] == spell.targets.get(2)[1])) &&
+                                (spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[0] - 2));
+                    }
+                    case water -> {
+                        return true;
+                    }
+                    case earth -> {
+                        // (1)(2)
+                        // (3)(4)
+                        return (spell.targets.get(0)[0] == spell.targets.get(2)[0] &&
+                                spell.targets.get(1)[0] == spell.targets.get(3)[0] &&
+                                spell.targets.get(0)[0] == spell.targets.get(1)[0] - 1 &&
+                                spell.targets.get(2)[0] == spell.targets.get(3)[0] - 1) &&
+                                (spell.targets.get(0)[1] == spell.targets.get(1)[1] &&
+                                spell.targets.get(2)[1] == spell.targets.get(3)[1] &&
+                                spell.targets.get(0)[1] == spell.targets.get(2)[1] - 1 &&
+                                spell.targets.get(1)[1] == spell.targets.get(3)[1] - 1);
+
+                    }
+                    case air -> {
+                        return spell.targets.size() == 1 && board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
+                                Math.abs(spell.targets.getFirst()[0] - spell.xFrom) == 1 && Math.abs(spell.targets.getFirst()[1] - spell.xFrom) == 1;
+                    }
+                    case spirit -> {
+                        return spell.targets.size() == 2 &&board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() != null &&
+                                board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() != null &&
+                                board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece().getPlayer() == mage.getPlayer() &&
+                                board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece().getPlayer() == mage.getPlayer();
+                    }
+                }
             }
         }
         return false;
