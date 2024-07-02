@@ -1,4 +1,7 @@
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Game {
     private final Tile[][] board;
@@ -283,12 +286,16 @@ public class Game {
             case offense -> {
                 if (spell.targets.isEmpty()) return false;
                 int[] target = spell.targets.getFirst();
-                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() != mage.getPlayer() && isSpellPathFree(spell);
+                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() != mage.getPlayer() &&
+                        board[target[0]][target[1]].getPiece().getSpellProtectedTimer() == 0 && isSpellPathFree(spell);
             }
             case defense -> {
-                if (spell.targets.isEmpty()) return false;
+                if (spell.targets.isEmpty()) return true;
                 int[] target = spell.targets.getFirst();
-                return spell.targets.size() == 1  && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer();
+                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer() &&
+                        board[target[0]][target[1]].getPiece().getAttackProtectedTimer() == 0 &&
+                        board[target[0]][target[1]].getPiece().getSpellProtectedTimer() == 0 &&
+                        board[target[0]][target[1]].getPiece().getSpellReflectionTimer() == 0;
             }
             case utility -> {
                 switch (dataOfSpell.mageType) {
@@ -396,6 +403,7 @@ public class Game {
         ArrayList<Turn> possibleTurns = new ArrayList<>();
 
         int tempSize = 0;
+        int breakPoint = 5_000_000;
 
         // x x x
         int[][] position = fetchPositionPieces();
@@ -406,7 +414,7 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-            possibleTurns.add(new Turn(null, null, null, attack, null));
+            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(null, null, null, attack, null));
         }
         tempSize = logAndResetState("x a x", tempSize, player, possibleTurns, position);
 
@@ -414,7 +422,7 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = generatePossibleSpellCombinations(player);
         if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-            possibleTurns.add(new Turn(null, null, null, null, spells));
+            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(null, null, null, null, spells));
         }
         tempSize = logAndResetState("x x s", tempSize, player, possibleTurns, position);
 
@@ -422,7 +430,7 @@ public class Game {
         position = fetchPositionPieces();
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-                possibleTurns.add(new Turn(null, null, null, attack, spells));
+                if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(null, null, null, attack, spells));
             }
         }
         tempSize = logAndResetState("x a s", tempSize, player, possibleTurns, position);
@@ -431,7 +439,7 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<Move> possibleMoves = generatePossibleMoves(player);
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            possibleTurns.add(new Turn(move, null, null, null, null));
+            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, null, null));
         }
         tempSize = logAndResetState("m x x", tempSize, player, possibleTurns, position);
 
@@ -441,7 +449,7 @@ public class Game {
             doMove(move, false);
             possibleAttacks = generatePossibleAttacks(player);
             if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-                possibleTurns.add(new Turn(move, null, null, attack, null));
+                if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, attack, null));
             }
             undoMove(move);
         }
@@ -453,7 +461,7 @@ public class Game {
             doMove(move, false);
             possibleSpellCombinations = generatePossibleSpellCombinations(player);
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-                possibleTurns.add(new Turn(move, null, null, null, spells));
+                if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, null, spells));
             }
             undoMove(move);
         }
@@ -469,7 +477,7 @@ public class Game {
                 Object[] guardPosition = doAttack(attack);
                 possibleSpellCombinations = generatePossibleSpellCombinations(player);
                 if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-                    possibleTurns.add(new Turn(move, null, null, attack, spells));
+                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, attack, spells));
                 }
                 undoAttack(attack, piece, guardPosition);
             }
@@ -484,7 +492,7 @@ public class Game {
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                possibleTurns.add(new Turn(move, move2, null, null, null));
+                if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, null, null));
             }
             undoMove(move);
         }
@@ -500,7 +508,7 @@ public class Game {
                 doMove(move2, false);
                 possibleAttacksAfterMove1 = generatePossibleAttacks(player);
                 if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
-                    possibleTurns.add(new Turn(move, move2, null, attack, null));
+                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, attack, null));
                 }
                 undoMove(move2);
             }
@@ -518,7 +526,7 @@ public class Game {
                 doMove(move2, false);
                 possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                 if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
-                    possibleTurns.add(new Turn(move, move2, null, null, spells));
+                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, null, spells));
                 }
                 undoMove(move2);
             }
@@ -539,7 +547,7 @@ public class Game {
                     Object[] guardPosition = doAttack(attack);
                     possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
-                        possibleTurns.add(new Turn(move, move2, null, attack, spells));
+                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, attack, spells));
                     }
                     undoAttack(attack, piece, guardPosition);
                 }
@@ -559,7 +567,7 @@ public class Game {
                 doMove(move2, false);
                 possibleMovesAfterMove2 = generatePossibleMoves(player);
                 if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    possibleTurns.add(new Turn(move, move2, move3, null, null));
+                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, null));
                 }
                 undoMove(move2);
             }
@@ -580,7 +588,7 @@ public class Game {
                     doMove(move3, false);
                     possibleAttacksAfterMove2 = generatePossibleAttacks(player);
                     if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
-                        possibleTurns.add(new Turn(move, move2, move3, attack, null));
+                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, null));
                     }
                     undoMove(move3);
                 }
@@ -603,7 +611,7 @@ public class Game {
                     doMove(move3, false);
                     possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spell: possibleSpellsAfterMove2) {
-                        possibleTurns.add(new Turn(move, move2, move3, null, spell));
+                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, spell));
                     }
                     undoMove(move3);
                 }
@@ -629,7 +637,7 @@ public class Game {
                         Object[] guardPosition = doAttack(attack);
                         possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
                         if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove2) {
-                            possibleTurns.add(new Turn(move, move2, move3, attack, spells));
+                            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, spells));
                         }
                         undoAttack(attack, piece, guardPosition);
                     }
@@ -665,6 +673,37 @@ public class Game {
         setPiecesPosition(position);
         resetHasMoved(player);
         System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
+        if (text.contains("s") && (possibleTurns.size() - tempSize) > 0) {
+            Map<String, Integer> spellSequenceCount = new HashMap<>();
+            Map<String, Integer> spellCastCount = new HashMap<>();
+            for (Turn turn : possibleTurns.subList(tempSize, possibleTurns.size())) {
+                StringBuilder sequence = new StringBuilder();
+                for (TurnSpell spell : turn.spells) {
+                    sequence.append(spellData[spell.spellDataIndex].spellType.name().charAt(0));
+                    String spellKey = spellData[spell.spellDataIndex].spellType.name().charAt(0) +
+                            spellData[spell.spellDataIndex].mageType.name().substring(0, 1).toLowerCase();
+                    spellCastCount.put(spellKey, spellCastCount.getOrDefault(spellKey, 0) + 1);
+                }
+                String sequenceString = sequence.toString();
+                spellSequenceCount.put(sequenceString, spellSequenceCount.getOrDefault(sequenceString, 0) + 1);
+            }
+            System.out.println("Spell Sequence Counts:");
+            for (Map.Entry<String, Integer> entry : spellSequenceCount.entrySet()) {
+                System.out.println(entry.getKey() + ": " + entry.getValue());
+            }
+            System.out.println("Spell Cast Count:");
+            for (SpellType spellType : SpellType.values()) {
+                for (PieceType mageType : PieceType.values()) {
+                    if (mageType == PieceType.guard) continue;
+                    String spellKey = spellType.name().charAt(0) + mageType.name().substring(0, 1).toLowerCase();
+                    int count = spellCastCount.getOrDefault(spellKey, 0);
+                    if (count > 0) System.out.println(spellKey + ": " + count);
+                }
+            }
+            spellSequenceCount.clear(); // TODO actually clear the counting things... like why tf they ain't doing it
+            spellCastCount.clear();
+        }
+
         return possibleTurns.size();
     }
 
@@ -758,12 +797,12 @@ public class Game {
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = new ArrayList<>();
         int maxSpells = getSpellAmount();
 
-        generateSpellCombo(player, maxSpells, possibleSpellCombinations);
+        generateSpellCombo(player, maxSpells, possibleSpellCombinations, new ArrayList<>());
 
         return possibleSpellCombinations;
     }
 
-    private void generateSpellCombo(Player player, int maxSpells, ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations) {
+    private void generateSpellCombo(Player player, int maxSpells, ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations, ArrayList<TurnSpell> currentCombination) {
         int availableTokens = player.getSpellTokens();
 
         ArrayList<TurnSpell> allVariations;
@@ -776,17 +815,16 @@ public class Game {
                     allVariations = generateVariations(baseVariation);
                     allVariations.removeIf(variation -> variation.targets.isEmpty());
 
-                    for (TurnSpell variation : allVariations) {
-                        ArrayList<TurnSpell> singleSpellCombination = new ArrayList<>();
-                        singleSpellCombination.add(variation);
-                        possibleSpellCombinations.add(singleSpellCombination);
-                    }
+                    for (TurnSpell variation : allVariations) { // TODO also add singular combo, not only with all the spells inside
+                        ArrayList<TurnSpell> newCombination = new ArrayList<>(currentCombination);
+                        newCombination.add(variation);
 
-                    if (maxSpells > 1) {
-                        for (TurnSpell variation : allVariations) {
+                        if (maxSpells == 1) {
+                            possibleSpellCombinations.add(newCombination);
+                        } else {
                             Game gameState = copyGameState();
                             castSpell(variation, player);
-                            generateSpellCombo(player, maxSpells - 1, possibleSpellCombinations);
+                            generateSpellCombo(player, maxSpells - 1, possibleSpellCombinations, newCombination);
                             loadGameState(gameState);
                         }
                     }
@@ -818,10 +856,12 @@ public class Game {
                     TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
                     if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
                 }
+                TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, new ArrayList<>());
+                if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
             }
             case utility -> {
                 switch (dataOfSpell.mageType) {
-                    case fire -> {
+                    case fire -> { // TODO check why isn't used
                         // Horizontal 3x1
                         for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
                             int x = tilePosition[0];
@@ -883,14 +923,24 @@ public class Game {
                             int x = tilePosition[0];
                             int y = tilePosition[1];
                             if (x + 1 <= 7 && y + 1 <= 7) {
+                                boolean hasEnemyPiece = false;
                                 ArrayList<int[]> targets = new ArrayList<>();
                                 targets.add(new int[]{x, y});
                                 targets.add(new int[]{x + 1, y});
                                 targets.add(new int[]{x, y + 1});
                                 targets.add(new int[]{x + 1, y + 1});
-                                TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
-                                if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
-                                    allVariations.add(variation);
+                                for (int[] target : targets) {
+                                    Tile tile = board[target[0]][target[1]];
+                                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()) {
+                                        hasEnemyPiece = true;
+                                        break;
+                                    }
+                                }
+                                if (hasEnemyPiece) {
+                                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                    if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) {
+                                        allVariations.add(variation);
+                                    }
                                 }
                             }
                         }
@@ -905,7 +955,7 @@ public class Game {
                             if (isLegalSpell(variation, getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer()))) allVariations.add(variation);
                         }
                     }
-                    case spirit -> {
+                    case spirit -> { // TODO check if working as intended
                         Player player = getPlayer(board[baseVariation.xFrom][baseVariation.yFrom].getPiece().getPlayer());
                         ArrayList<int[]> playerPieces = new ArrayList<>();
                         for (Piece piece : player.getPieces()) {
@@ -915,12 +965,25 @@ public class Game {
                         }
                         for (int i = 0; i < playerPieces.size(); i++) {
                             for (int j = i + 1; j < playerPieces.size(); j++) {
-                                ArrayList<int[]> targets = new ArrayList<>();
-                                targets.add(playerPieces.get(i));
-                                targets.add(playerPieces.get(j));
-                                TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
-                                if (isLegalSpell(variation, player)) {
-                                    allVariations.add(variation);
+                                int[] piece1 = playerPieces.get(i);
+                                int[] piece2 = playerPieces.get(j);
+                                boolean existsInverse = false;
+                                for (TurnSpell existingVariation : allVariations) {
+                                    if (existingVariation.targets.size() == 2 &&
+                                            Arrays.equals(existingVariation.targets.get(0), piece2) &&
+                                            Arrays.equals(existingVariation.targets.get(1), piece1)) {
+                                        existsInverse = true;
+                                        break;
+                                    }
+                                }
+                                if (!existsInverse) {
+                                    ArrayList<int[]> targets = new ArrayList<>();
+                                    targets.add(piece1);
+                                    targets.add(piece2);
+                                    TurnSpell variation = new TurnSpell(baseVariation.spellDataIndex, baseVariation.xFrom, baseVariation.yFrom, targets);
+                                    if (isLegalSpell(variation, player)) {
+                                        allVariations.add(variation);
+                                    }
                                 }
                             }
                         }
