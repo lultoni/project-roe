@@ -2,11 +2,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Game {
-    private final Tile[][] board;
+    final Tile[][] board;
     private Player player0;
     private Player player1;
     private double turnCounter;
     private final SpellData[] spellData;
+    private boolean waitingForHuman;
+    private Turn humanTurn;
 
     public Game() {
         board = new Tile[8][8];
@@ -34,7 +36,7 @@ public class Game {
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true)};
-        player0 = new Player(p0p, false);
+        player0 = new Player(p0p, true);
         player1 = new Player(p1p, false);
         setPiecesStart();
 
@@ -56,6 +58,9 @@ public class Game {
         spellData[12] = new SpellData(4, "Overgrown", "2 by 2 area make pieces skip turn (Range + 1).", SpellType.utility, PieceType.earth);
         spellData[13] = new SpellData(2, "Zephyr Step", "Move to an adjacent tile.", SpellType.utility, PieceType.air);
         spellData[14] = new SpellData(4, "Soul Swap", "Switch two of your own pieces.", SpellType.utility, PieceType.spirit);
+
+        waitingForHuman = false;
+        humanTurn = null;
     }
 
     private void loadMap() {
@@ -110,13 +115,14 @@ public class Game {
         setPiece(2, 1, p1p[9]);
     }
 
-    public void startGame() {
+    public void startGame(Window window) {
         boolean player = turnCounter % 1 != 0;
         while(isGameOver() == 2) {
             System.out.println("\nCURRENT TURN: " + turnCounter);
             Player p = getPlayer(player);
             printBoardPieces();
-            ArrayList<Turn> possibleTurns = generatePossibleTurns(p);
+            ArrayList<Turn> possibleTurns = (p.getIsHuman()) ? null : generatePossibleTurns(p);
+            waitingForHuman = p.getIsHuman();
             Turn turn = p.fetchTurn(possibleTurns, this);
             System.out.println((player) ? "Player1 Turn:" : "Player0 Turn:");
             turn.print();
@@ -124,6 +130,11 @@ public class Game {
             player = !player;
             p.setSpellTokens(p.getSpellTokens() + getSpellTokenChange());
             if(isGameOver() != 2) printBoardPieces();
+            long endTime = System.currentTimeMillis() + 100;
+            while (System.currentTimeMillis() < endTime) {
+                Thread.onSpinWait();
+            }
+            window.updateWindow();
         }
         switch (isGameOver()) {
             case -1 -> System.out.println("Draw between p0 and p1");
@@ -153,15 +164,19 @@ public class Game {
                     case -1 -> score += 25;
                 }
                 score += getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
-                score += player0.getSpellTokens() * 20;
+                score += player0.getSpellTokens() * 12.5;
                 boolean isGuardProtected = false;
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
                     if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
                         isGuardProtected = true;
                         break;
                     }
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= 10;
                 }
                 if (isGuardProtected) score += 20;
+                if (turnCounter % 1 != 0) for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= 5;
+                }
             }
         }
         for (Piece piece: player1.getPieces()) {
@@ -172,15 +187,19 @@ public class Game {
                     case -1 -> score -= 25;
                 }
                 score -= getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
-                score -= player1.getSpellTokens() * 20;
+                score -= player1.getSpellTokens() * 12.5;
                 boolean isGuardProtected = false;
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
                     if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
                         isGuardProtected = true;
                         break;
                     }
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score += 10;
                 }
                 if (isGuardProtected) score -= 20;
+                if (turnCounter % 1 == 0) for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score += 5;
+                }
             }
         }
         return score;
@@ -1486,5 +1505,18 @@ public class Game {
 
     public SpellData[] getSpellData() {
         return spellData;
+    }
+
+    public boolean isWaitingForHuman() {
+        return waitingForHuman;
+    }
+
+    public Turn getHumanTurn() {
+        return humanTurn;
+    }
+
+    public void setHumanTurn(Turn turn) {
+        humanTurn = turn;
+        waitingForHuman = false;
     }
 }
