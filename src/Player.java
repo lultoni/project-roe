@@ -31,7 +31,7 @@ public class Player {
             System.out.println("cur turn " + ((game.getTurnCounter() % 1 == 0) ? "0" : "1"));
 
             for (Turn turn : possibleTurns) {
-                game.executeTurn(turn, game.getPlayer(game.getTurnCounter() % 1 != 0));
+                game.executeTurn(turn, game.getPlayer(game.getTurnCounter() % 1 != 0), null);
                 game.setTurnCounter(game.getTurnCounter() - 0.5);
                 double score = game.evaluate();
 
@@ -44,7 +44,7 @@ public class Player {
                         bestTurns.add(turn);
                     }
                 } else {
-                    if (score < bestScore) {
+                    if (score < bestScore) { // TODO no way this ai ain't retarded bruh, like win the game!!!
                         bestScore = score;
                         bestTurns.clear();
                         bestTurns.add(turn);

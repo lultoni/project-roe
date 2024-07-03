@@ -215,11 +215,11 @@ public class Window extends JFrame {
             case earth -> location = (!piece.getPlayer()) ? "BlueEarthMage.png" : "RedEarthMage.png";
             case water -> location = (!piece.getPlayer()) ? "BlueWaterMage.png" : "RedWaterMage.png";
             case spirit -> location = (!piece.getPlayer()) ? "BlueSpiritMage.png" : "RedSpiritMage.png";
-        }
+        } // TODO has moved from prev commit
         return new ImageIcon(location).getImage();
     }
 
-    public void updateWindow() {
+    public void updateWindow() { // TODO spell animations?
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 String terrainLocation = "";
@@ -230,7 +230,7 @@ public class Window extends JFrame {
                     case mountain -> terrainLocation = "MountainSprite.png";
                     case forest -> terrainLocation = "ForrestSprite.png";
                     case plains -> terrainLocation = "PlainsSprite.png";
-                }
+                } // TODO terrain effect
 
                 Image before_ter = loadImage(terrainLocation);
                 int width = 70;
@@ -240,6 +240,9 @@ public class Window extends JFrame {
                     width = (int) (((getWidth() / 2) / 8) * dif);
                     height = (int) ((getHeight() / 8) * dif);
                 }
+
+                // TODO spell protected & co.
+                // TODO on good terrain
 
                 BufferedImage combinedImage;
                 if (game.board[x][y].getPiece() != null) {

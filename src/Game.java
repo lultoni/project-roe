@@ -36,7 +36,7 @@ public class Game {
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true)};
-        player0 = new Player(p0p, true);
+        player0 = new Player(p0p, false);
         player1 = new Player(p1p, false);
         setPiecesStart();
 
@@ -118,28 +118,32 @@ public class Game {
     public void startGame(Window window) {
         boolean player = turnCounter % 1 != 0;
         while(isGameOver() == 2) {
-            System.out.println("\nCURRENT TURN: " + turnCounter);
+            System.out.println("\nCURRENT TURN: " + turnCounter + " - STG: " + getSpellTokenChange() + " - SA: " + getSpellAmount());
             Player p = getPlayer(player);
             printBoardPieces();
             ArrayList<Turn> possibleTurns = (p.getIsHuman()) ? null : generatePossibleTurns(p);
             waitingForHuman = p.getIsHuman();
             Turn turn = p.fetchTurn(possibleTurns, this);
-            System.out.println((player) ? "Player1 Turn:" : "Player0 Turn:");
+            System.out.println(((player) ? "Player1 Turn: (ST: " : "Player0 Turn:(ST: ") + p.getSpellTokens() + ")");
             turn.print();
-            executeTurn(turn, p);
+            executeTurn(turn, p, window);
             player = !player;
             p.setSpellTokens(p.getSpellTokens() + getSpellTokenChange());
             if(isGameOver() != 2) printBoardPieces();
-            long endTime = System.currentTimeMillis() + 100;
-            while (System.currentTimeMillis() < endTime) {
-                Thread.onSpinWait();
-            }
             window.updateWindow();
+            waiter(100);
         }
         switch (isGameOver()) {
             case -1 -> System.out.println("Draw between p0 and p1");
             case 0 -> System.out.println("Win for p0");
             case 1 -> System.out.println("Win for p1");
+        }
+    }
+
+    private void waiter(int ms) {
+        long endTime = System.currentTimeMillis() + ms;
+        while (System.currentTimeMillis() < endTime) {
+            Thread.onSpinWait();
         }
     }
 
@@ -156,49 +160,53 @@ public class Game {
             if (over == 0) return 99999;
             if (over == 1) return -99999;
         }
-        for (Piece piece: player0.getPieces()) {
+        score += evaluateHelper(player0);
+        score -= evaluateHelper(player1);
+        return score;
+    }
+
+    private double evaluateHelper(Player p) {
+        double score = 0;
+        double spellTokenValue = 7.5;
+        double mageScoreBoost = 1.3;
+        double enemyAdjacentReduction = 8.5;
+        double guardProtectionBonus = 20;
+        double goodTerrain = 100;
+        double okayTerrain = goodTerrain * 0.5;
+        double badTerrain = okayTerrain * 0.5;
+
+        for (Piece piece: p.getPieces()) {
             if (piece.getXPos() != -1) {
-                switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
-                    case 1 -> score += 100;
-                    case 0 -> score += 50;
-                    case -1 -> score += 25;
+                boolean isMage = piece.getType() != PieceType.guard;
+                int pta = pieceTerrainAdvantage(piece.getXPos(), piece.getYPos());
+                switch (pta) {
+                    case 1 -> score += goodTerrain * ((isMage) ? mageScoreBoost : 1);
+                    case 0 -> score += okayTerrain * ((isMage) ? mageScoreBoost : 1);
+                    case -1 -> score += badTerrain * ((isMage) ? mageScoreBoost : 1);
                 }
                 score += getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
-                score += player0.getSpellTokens() * 12.5;
+                score += p.getSpellTokens() * spellTokenValue;
                 boolean isGuardProtected = false;
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
-                    if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
+                    if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer() && isMage) {
                         isGuardProtected = true;
-                        break;
+                        if (piece.getType() == PieceType.spirit) score += guardProtectionBonus * 0.2;
                     }
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= 10;
-                }
-                if (isGuardProtected) score += 20;
-                if (turnCounter % 1 != 0) for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= 5;
-                }
-            }
-        }
-        for (Piece piece: player1.getPieces()) {
-            if (piece.getXPos() != -1) {
-                switch (pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
-                    case 1 -> score -= 100;
-                    case 0 -> score -= 50;
-                    case -1 -> score -= 25;
-                }
-                score -= getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
-                score -= player1.getSpellTokens() * 12.5;
-                boolean isGuardProtected = false;
-                for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
-                    if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer()) {
-                        isGuardProtected = true;
-                        break;
+                    if ((piece.getPlayer()) ? turnCounter % 1 != 0 : turnCounter % 1 == 0) if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction;
+                    if (isMage && pta != 1) switch (terrainAdvantage(piece, tile)) {
+                        case 1 -> score += goodTerrain * 0.05;
+                        case 0 -> score += okayTerrain * 0.05;
+                        case -1 -> score += badTerrain * 0.05;
                     }
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score += 10;
                 }
-                if (isGuardProtected) score -= 20;
-                if (turnCounter % 1 == 0) for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score += 5;
+                if (isGuardProtected) score += guardProtectionBonus;
+                if ((piece.getPlayer()) ? turnCounter % 1 != 0 : turnCounter % 1 == 0) for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / 2;
+                    if (isMage && pta == 1) switch (terrainAdvantage(piece, tile)) {
+                        case 1 -> score += goodTerrain * 0.03;
+                        case 0 -> score += okayTerrain * 0.03;
+                        case -1 -> score += badTerrain * 0.03;
+                    }
                 }
             }
         }
@@ -269,15 +277,36 @@ public class Game {
         return 2; // Game isn't over
     }
 
-    public void executeTurn(Turn turn, Player player) {
+    public void executeTurn(Turn turn, Player player, Window window) {
+        int ms = 400;
         doMove(turn.move1, false);
+        if (window != null) {
+            window.updateWindow();
+            waiter(ms);
+        }
         doMove(turn.move2, false);
+        if (window != null) {
+            window.updateWindow();
+            waiter(ms);
+        }
         doMove(turn.move3, false);
+        if (window != null) {
+            window.updateWindow();
+            waiter(ms);
+        }
         resetHasMoved(player);
         updateTimers();
         doAttack(turn.attack);
+        if (window != null) {
+            window.updateWindow();
+            waiter(ms);
+        }
         if (turn.spells != null) for (TurnSpell spell: turn.spells) {
             castSpell(spell, player);
+            if (window != null) {
+                window.updateWindow();
+                waiter(ms);
+            }
         }
         updateTimers();
         turnCounter += 0.5;
@@ -413,7 +442,7 @@ public class Game {
     }
 
     private boolean checkPotentialGuard(Piece potentialGuard, int xFrom, int yFrom) {
-        return potentialGuard == null || potentialGuard.getType() != PieceType.guard || potentialGuard.getPlayer() != board[xFrom][yFrom].getPiece().getPlayer();
+        return potentialGuard == null || potentialGuard.getType() != PieceType.guard || potentialGuard.getPlayer() == board[xFrom][yFrom].getPiece().getPlayer();
     }
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
@@ -578,97 +607,97 @@ public class Game {
         }
         tempSize = logAndResetState("m m a s", tempSize, player, possibleTurns, position);
 
-        // m m m x x
-        position = fetchPositionPieces();
-        ArrayList<Move> possibleMovesAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, null));
-                }
-                undoMove(move2);
-            }
-            undoMove(move);
-        }
-        tempSize = logAndResetState("m m m x x", tempSize, player, possibleTurns, position);
-
-        // m m m a x
-        position = fetchPositionPieces();
-        ArrayList<Attack> possibleAttacksAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    doMove(move3, false);
-                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
-                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
-                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, null));
-                    }
-                    undoMove(move3);
-                }
-                undoMove(move2);
-            }
-            undoMove(move);
-        }
-        tempSize = logAndResetState("m m m a x", tempSize, player, possibleTurns, position);
-
-        // m m m x s
-        position = fetchPositionPieces();
-        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    doMove(move3, false);
-                    possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
-                    if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spell: possibleSpellsAfterMove2) {
-                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, spell));
-                    }
-                    undoMove(move3);
-                }
-                undoMove(move2);
-            }
-            undoMove(move);
-        }
-        tempSize = logAndResetState("m m m x s", tempSize, player, possibleTurns, position);
-
-        // m m m a s
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    doMove(move3, false);
-                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
-                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
-                        Piece piece = storePieceOfAttack(attack);
-                        Object[] guardPosition = doAttack(attack);
-                        possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
-                        if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove2) {
-                            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, spells));
-                        }
-                        undoAttack(attack, piece, guardPosition);
-                    }
-                    undoMove(move3);
-                }
-                undoMove(move2);
-            }
-            undoMove(move);
-        }
-        logAndResetState("m m m a s", tempSize, player, possibleTurns, position);
+//        // m m m x x
+//        position = fetchPositionPieces();
+//        ArrayList<Move> possibleMovesAfterMove2;
+//        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+//            doMove(move, false);
+//            possibleMovesAfterMove1 = generatePossibleMoves(player);
+//            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+//                doMove(move2, false);
+//                possibleMovesAfterMove2 = generatePossibleMoves(player);
+//                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+//                    if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, null));
+//                }
+//                undoMove(move2);
+//            }
+//            undoMove(move);
+//        }
+//        tempSize = logAndResetState("m m m x x", tempSize, player, possibleTurns, position);
+//
+//        // m m m a x
+//        position = fetchPositionPieces();
+//        ArrayList<Attack> possibleAttacksAfterMove2;
+//        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+//            doMove(move, false);
+//            possibleMovesAfterMove1 = generatePossibleMoves(player);
+//            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+//                doMove(move2, false);
+//                possibleMovesAfterMove2 = generatePossibleMoves(player);
+//                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+//                    doMove(move3, false);
+//                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
+//                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
+//                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, null));
+//                    }
+//                    undoMove(move3);
+//                }
+//                undoMove(move2);
+//            }
+//            undoMove(move);
+//        }
+//        tempSize = logAndResetState("m m m a x", tempSize, player, possibleTurns, position);
+//
+//        // m m m x s
+//        position = fetchPositionPieces();
+//        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove2;
+//        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+//            doMove(move, false);
+//            possibleMovesAfterMove1 = generatePossibleMoves(player);
+//            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+//                doMove(move2, false);
+//                possibleMovesAfterMove2 = generatePossibleMoves(player);
+//                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+//                    doMove(move3, false);
+//                    possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
+//                    if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spell: possibleSpellsAfterMove2) {
+//                        if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, null, spell));
+//                    }
+//                    undoMove(move3);
+//                }
+//                undoMove(move2);
+//            }
+//            undoMove(move);
+//        }
+//        tempSize = logAndResetState("m m m x s", tempSize, player, possibleTurns, position);
+//
+//        // m m m a s
+//        position = fetchPositionPieces();
+//        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+//            doMove(move, false);
+//            possibleMovesAfterMove1 = generatePossibleMoves(player);
+//            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+//                doMove(move2, false);
+//                possibleMovesAfterMove2 = generatePossibleMoves(player);
+//                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
+//                    doMove(move3, false);
+//                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
+//                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
+//                        Piece piece = storePieceOfAttack(attack);
+//                        Object[] guardPosition = doAttack(attack);
+//                        possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
+//                        if (!possibleSpellsAfterMove2.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove2) {
+//                            if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, move3, attack, spells));
+//                        }
+//                        undoAttack(attack, piece, guardPosition);
+//                    }
+//                    undoMove(move3);
+//                }
+//                undoMove(move2);
+//            }
+//            undoMove(move);
+//        }
+//        logAndResetState("m m m a s", tempSize, player, possibleTurns, position);
 
         return possibleTurns;
     }
@@ -693,34 +722,7 @@ public class Game {
     private int logAndResetState(String text, int tempSize, Player player, ArrayList<Turn> possibleTurns, int[][] position) {
         setPiecesPosition(position);
         resetHasMoved(player);
-        System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
-//        if (text.contains("s") && (possibleTurns.size() - tempSize) > 0) {
-//            Map<String, Integer> spellSequenceCount = new HashMap<>();
-//            Map<String, Integer> spellCastCount = new HashMap<>();
-//            for (Turn turn : possibleTurns.subList(tempSize, possibleTurns.size())) {
-//                String sequence = "";
-//                for (TurnSpell spell : turn.spells) {
-//                    sequence += (spellData[spell.spellDataIndex].spellType.name().charAt(0));
-//                    String spellKey = spellData[spell.spellDataIndex].spellType.name().charAt(0) + spellData[spell.spellDataIndex].mageType.name().substring(0, 1).toLowerCase();
-//                    spellCastCount.put(spellKey, spellCastCount.getOrDefault(spellKey, 0) + 1);
-//                }
-//                spellSequenceCount.put(sequence, spellSequenceCount.getOrDefault(sequence, 0) + 1);
-//            }
-//            System.out.println("Spell Sequence Counts:");
-//            for (Map.Entry<String, Integer> entry : spellSequenceCount.entrySet()) {
-//                System.out.println(entry.getKey() + ": " + entry.getValue());
-//            }
-//            System.out.println("Spell Cast Count:");
-//            for (SpellType spellType : SpellType.values()) {
-//                for (PieceType mageType : PieceType.values()) {
-//                    if (mageType == PieceType.guard) continue;
-//                    String spellKey = spellType.name().charAt(0) + mageType.name().substring(0, 1).toLowerCase();
-//                    int count = spellCastCount.getOrDefault(spellKey, 0);
-//                    if (count > 0) System.out.println(spellKey + ": " + count);
-//                }
-//            }
-//        }
-
+        // System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
         return possibleTurns.size();
     }
     private void setPiecesPosition(int[][] position) {
@@ -1311,8 +1313,12 @@ public class Game {
         if (board[x][y].getPiece() == null) throw new IllegalArgumentException("There is no Piece on x" + x + " y" + y + ".");
         PieceType type = board[x][y].getPiece().getType();
         if (type == PieceType.guard || type == PieceType.spirit) return 0;
-        Terrain terrain = board[x][y].getTerrain();
-        switch (type) {
+        return terrainAdvantage(board[x][y].getPiece(), board[x][y]);
+    }
+
+    private int terrainAdvantage(Piece piece, Tile tile) {
+        Terrain terrain = tile.getTerrain();
+        switch (piece.getType()) {
             case air -> {
                 if (terrain == Terrain.mountain) return 1;
                 if (terrain == Terrain.forest) return -1;
