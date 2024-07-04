@@ -9,7 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Window extends JFrame {
-    private Game game;
+    private final Game game;
     JTextField move1 = new JTextField();
     JTextField move2 = new JTextField();
     JTextField move3 = new JTextField();
@@ -33,34 +33,8 @@ public class Window extends JFrame {
 
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                String terrainLocation = "";
-                Terrain tileType = game.board[x][y].getTerrain();
-
-                switch (tileType) {
-                    case lake -> terrainLocation = "LakeSprite.png";
-                    case mountain -> terrainLocation = "MountainSprite.png";
-                    case forest -> terrainLocation = "ForrestSprite.png";
-                    case plains -> terrainLocation = "PlainsSprite.png";
-                }
-
-                Image before_ter = loadImage(terrainLocation);
-                int width = 70;
-                int height = 70;
-                if (getWidth() > 0 && getHeight() > 0) {
-                    double dif = 1;
-                    width = (int) (((getWidth() / 2) / 8) * dif);
-                    height = (int) ((getHeight() / 8) * dif);
-                }
-
-                BufferedImage combinedImage;
-                if (game.board[x][y].getPiece() != null) {
-                    Image before_pie = getPieceSprite(game.board[x][y].getPiece());
-                    combinedImage = combineImages(before_ter, before_pie, width, height);
-                } else {
-                    combinedImage = resizeImage(before_ter, width, height);
-                }
-
-                boardDisplay[x][y] = new JLabel(new ImageIcon(combinedImage));
+                boardDisplay[x][y] = new JLabel();
+                boardDisplay[x][y].setIcon(new ImageIcon(tileImage(x, y)));
                 boardPanel.add(boardDisplay[x][y]);
             }
         }
@@ -150,7 +124,7 @@ public class Window extends JFrame {
         ArrayList<TurnSpell> turnSpells = new ArrayList<>();
 
         // Regex to match the entire TurnSpell component
-        Pattern turnSpellPattern = Pattern.compile("\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*\\[(.*?)\\]\\)");
+        Pattern turnSpellPattern = Pattern.compile("\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*\\[(.*?)]\\)");
         Matcher matcher = turnSpellPattern.matcher(spellStr);
 
         while (matcher.find()) {
@@ -184,7 +158,7 @@ public class Window extends JFrame {
         try {
             return ImageIO.read(new File(path));
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("loadImage error");
             return null;
         }
     }
@@ -198,10 +172,25 @@ public class Window extends JFrame {
     }
 
     private BufferedImage combineImages(Image baseImage, Image overlayImage, int width, int height) {
+        return combineImages(baseImage, overlayImage, width, height, 1);
+    }
+
+    private BufferedImage combineImages(Image baseImage, Image overlayImage, int width, int height, double overlaySizeModifier) {
         BufferedImage combinedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = combinedImage.createGraphics();
         g2d.drawImage(baseImage, 0, 0, width, height, null);
-        g2d.drawImage(overlayImage, 0, 0, width, height, null);
+        g2d.drawImage(overlayImage, 0, 0, (int) (width * overlaySizeModifier), (int) (height * overlaySizeModifier), null);
+        g2d.dispose();
+        return combinedImage;
+    }
+
+    private BufferedImage combineImages(Image baseImage, String overlayText, int width, int height) {
+        BufferedImage combinedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = combinedImage.createGraphics();
+        g2d.drawImage(baseImage, 0, 0, width, height, null);
+        g2d.setColor(Color.white);
+        g2d.setFont(new Font("arial", Font.BOLD, 20));
+        g2d.drawString(overlayText, (int) (width / 3.6), (int) (height / 1.8));
         g2d.dispose();
         return combinedImage;
     }
@@ -215,47 +204,87 @@ public class Window extends JFrame {
             case earth -> location = (!piece.getPlayer()) ? "BlueEarthMage.png" : "RedEarthMage.png";
             case water -> location = (!piece.getPlayer()) ? "BlueWaterMage.png" : "RedWaterMage.png";
             case spirit -> location = (!piece.getPlayer()) ? "BlueSpiritMage.png" : "RedSpiritMage.png";
-        } // TODO has moved from prev commit
+        }
+        if (piece.hasMoved() || piece.getOvergrownTimer() > 0) location = "Moved" + location;
         return new ImageIcon(location).getImage();
     }
 
-    public void updateWindow() { // TODO spell animations?
+    public void updateWindow() { // TODO spell animations? Draw sprites for that
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                String terrainLocation = "";
-                Terrain tileType = game.board[x][y].getTerrain();
-
-                switch (tileType) {
-                    case lake -> terrainLocation = "LakeSprite.png";
-                    case mountain -> terrainLocation = "MountainSprite.png";
-                    case forest -> terrainLocation = "ForrestSprite.png";
-                    case plains -> terrainLocation = "PlainsSprite.png";
-                } // TODO terrain effect
-
-                Image before_ter = loadImage(terrainLocation);
-                int width = 70;
-                int height = 70;
-                if (getWidth() > 0 && getHeight() > 0) {
-                    double dif = 1;
-                    width = (int) (((getWidth() / 2) / 8) * dif);
-                    height = (int) ((getHeight() / 8) * dif);
-                }
-
-                // TODO spell protected & co.
-                // TODO on good terrain
-
-                BufferedImage combinedImage;
-                if (game.board[x][y].getPiece() != null) {
-                    Image before_pie = getPieceSprite(game.board[x][y].getPiece());
-                    combinedImage = combineImages(before_ter, before_pie, width, height);
-                } else {
-                    combinedImage = resizeImage(before_ter, width, height);
-                }
-
-                boardDisplay[x][y].setIcon(new ImageIcon(combinedImage));
+                boardDisplay[x][y].setIcon(new ImageIcon(tileImage(x, y)));
             }
         }
         revalidate();
         repaint();
+    }
+
+    private BufferedImage tileImage(int x, int y) {
+        String terrainLocation = "";
+        String timerString = "";
+        Terrain tileType = game.board[x][y].getTerrain();
+
+        switch (tileType) {
+            case lake -> terrainLocation = "LakeSprite.png";
+            case mountain -> terrainLocation = "MountainSprite.png";
+            case forest -> terrainLocation = "ForrestSprite.png";
+            case plains -> terrainLocation = "PlainsSprite.png";
+        }
+        if (game.board[x][y].getBlockedTimer() > 0) {
+            timerString = (String.valueOf(game.board[x][y].getBlockedTimer()));
+            terrainLocation = "BlockedEffect.png";
+        } else if (game.board[x][y].getDeathTimer() > 0) {
+            timerString = (String.valueOf(game.board[x][y].getDeathTimer()));
+            terrainLocation = "DeathEffect.png";
+        }
+
+
+        Image terrainImage = loadImage(terrainLocation);
+        int width = 70;
+        int height = 70;
+        if (getWidth() > 0 && getHeight() > 0) {
+            double dif = 1;
+            width = (int) (((getWidth() / 2) / 8) * dif);
+            height = (int) ((getHeight() / 8) * dif);
+        }
+
+        String protectionLocation = "";
+        Piece piece = game.board[x][y].getPiece();
+        if (piece != null) {
+            if (piece.getSpellProtectedTimer() > 0) {
+                timerString = (String.valueOf(piece.getSpellProtectedTimer()));
+                protectionLocation = "SpellBubble.png";
+            }
+            if (piece.getSpellReflectionTimer() > 0) {
+                timerString = (String.valueOf(piece.getSpellReflectionTimer()));
+                protectionLocation = "ReflectBubble.png";
+            }
+            if (piece.getAttackProtectedTimer() > 0) {
+                timerString = (String.valueOf(piece.getAttackProtectedTimer()));
+                protectionLocation = "AttackBubble.png";
+            }
+        }
+        Image protectionImage = (protectionLocation.isEmpty()) ? null : loadImage(protectionLocation);
+
+        String goodTerrainLocation = "";
+        if (piece != null) {
+            switch (game.pieceTerrainAdvantage(piece.getXPos(), piece.getYPos())) {
+                case 1 -> goodTerrainLocation = "GoodTerrain.png";
+                case -1 -> goodTerrainLocation = "BadTerrain.png";
+            }
+        }
+        Image goodTerrainImage = (goodTerrainLocation.isEmpty()) ? null : loadImage(goodTerrainLocation);
+
+        BufferedImage combinedImage;
+        if (game.board[x][y].getPiece() != null) {
+            Image pieceImage = getPieceSprite(game.board[x][y].getPiece());
+            combinedImage = combineImages(terrainImage, pieceImage, width, height);
+            if (protectionImage != null) combinedImage = combineImages(combinedImage, protectionImage, width, height);
+            if (goodTerrainImage != null) combinedImage = combineImages(combinedImage, goodTerrainImage, width, height, 0.4);
+        } else {
+            combinedImage = resizeImage(terrainImage, width, height);
+        }
+        combinedImage = combineImages(combinedImage, timerString, width, height);
+        return combinedImage;
     }
 }

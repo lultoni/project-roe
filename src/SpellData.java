@@ -29,7 +29,7 @@ public class SpellData {
                         removePiece(board, x, y);
                         setBlockedEffect(board, x, y, 1.75);
                     }
-                    case air -> {
+                    case air -> { // TODO test
                         removePiece(board, x, y);
                         pushBackAirOffense(board, x, y, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 1 : -1);
                     }
@@ -42,23 +42,17 @@ public class SpellData {
                     }
                 }
             }
-            case defense -> { // TODO
+            case defense -> {
+                int x = -1;
+                int y = -1;
+                if (!spell.targets.isEmpty()) {
+                    x = spell.targets.getFirst()[0];
+                    y = spell.targets.getFirst()[1];
+                }
                 switch (mageType) {
-                    case fire -> {
-
-                    }
-                    case water -> {
-
-                    }
-                    case earth -> {
-
-                    }
-                    case air -> {
-
-                    }
-                    case spirit -> {
-
-                    }
+                    case fire -> attackProtect(board, spell.xFrom, spell.yFrom, x, y);
+                    case water, earth, spirit -> spellProtect(board, spell.xFrom, spell.yFrom, x, y);
+                    case air -> reflectProtect(board, spell.xFrom, spell.yFrom, x, y);
                 }
             }
             case utility -> { // TODO
@@ -83,8 +77,22 @@ public class SpellData {
         }
     }
 
+    private void reflectProtect(Tile[][] board, int xFrom, int yFrom, int x, int y) {
+        board[xFrom][yFrom].getPiece().setSpellReflectionTimer(1);
+        board[x][y].getPiece().setSpellReflectionTimer(1);
+    }
+
+    private void spellProtect(Tile[][] board, int xFrom, int yFrom, int x, int y) {
+        board[xFrom][yFrom].getPiece().setSpellProtectedTimer(1);
+        board[x][y].getPiece().setSpellProtectedTimer(1);
+    }
+
+    private void attackProtect(Tile[][] board, int xFrom, int yFrom, int x, int y) {
+        board[xFrom][yFrom].getPiece().setAttackProtectedTimer(1);
+        board[x][y].getPiece().setAttackProtectedTimer(1);
+    }
+
     private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) {
-        // Define the sequence of tiles to check based on the direction
         int[] sequence = new int[8];
         if (direction == 1) {
             // Direction 1: (8)(7)(6)
