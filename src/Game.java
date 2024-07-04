@@ -42,7 +42,7 @@ public class Game {
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true)};
         player0 = new Player(p0p, false);
-        player1 = new Player(p1p, false);
+        player1 = new Player(p1p, true);
         setPiecesStart();
 
         turnCounter = 1;
@@ -128,9 +128,8 @@ public class Game {
             System.out.println("\nCURRENT TURN: " + turnCounter + " - STG: " + getSpellTokenChange() + " - SA: " + getSpellAmount());
             Player p = getPlayer(player);
             printBoardPieces();
-            ArrayList<Turn> possibleTurns = (p.getIsHuman()) ? null : generatePossibleTurns(p);
             waitingForHuman = p.getIsHuman();
-            Turn turn = p.fetchTurn(possibleTurns, this);
+            Turn turn = p.fetchTurn(this);
             System.out.println(((player) ? "\nPlayer1 Turn: (ST: " : "\nPlayer0 Turn:(ST: ") + p.getSpellTokens() + ")");
             turn.print();
             executeTurn(turn, p, window);
@@ -327,7 +326,13 @@ public class Game {
 
     private void castSpell(TurnSpell spell, Player player) {
         if (spell != null) {
-            if (!isLegalSpell(spell, player)) throw new IllegalArgumentException("The Spell that was provided is not Legal.");
+            if (!isLegalSpell(spell, player)) {
+                printBoardPieces();
+                printDebug = true;
+                spell.print();
+                isLegalSpell(spell, player);
+                throw new IllegalArgumentException("The Spell that was provided is not Legal.");
+            }
             spellData[spell.spellDataIndex].castEffect(spell, player, board, getPlayer(!board[spell.xFrom][spell.yFrom].getPiece().getPlayer()));
         }
     }
@@ -344,11 +349,35 @@ public class Game {
             if (printDebug) System.out.println("No mage found at the starting position.");
             return false;
         } else {
-            if (printDebug) System.out.println("Mage found: " + mage.getType());
-            if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType || mage.getOvergrownTimer() > 0) {
-                if (printDebug) System.out.println("Mage is either a guard, belongs to the wrong player, is not the right type, or is overgrown.");
+            if (printDebug) {
+                System.out.println("Mage found: " + mage.getType());
+                System.out.println("Mage details: ");
+                System.out.println("  Type: " + mage.getType());
+                System.out.println("  Player: " + mage.getPlayer());
+                System.out.println("  Expected Mage Type: " + dataOfSpell.mageType);
+                System.out.println("  Overgrown Timer: " + mage.getOvergrownTimer());
+                System.out.println("  Current Player: " + player);
+
+                if (mage.getType() == PieceType.guard) {
+                    System.out.println("Mage is a guard.");
+                }
+                if (!getPlayer(mage.getPlayer()).equals(player)) {
+                    System.out.println("Mage belongs to the wrong player.");
+                }
+                if (mage.getType() != dataOfSpell.mageType) {
+                    System.out.println("Mage is not the right type.");
+                }
+                if (mage.getOvergrownTimer() > 0) {
+                    System.out.println("Mage is overgrown.");
+                }
+            }
+            if (mage.getType() == PieceType.guard || !getPlayer(mage.getPlayer()).equals(player) || mage.getType() != dataOfSpell.mageType || mage.getOvergrownTimer() > 0) {
+                if (printDebug) {
+                    System.out.println("Mage is either a guard, belongs to the wrong player, is not the right type, or is overgrown.");
+                }
                 return false;
             }
+
         }
 
         if (printDebug) System.out.println(dataOfSpell.spellType);
@@ -504,6 +533,7 @@ public class Game {
 
     public ArrayList<Turn> generatePossibleTurns(Player player) {
         ArrayList<Turn> possibleTurns = new ArrayList<>();
+        if (isGameOver() != 2) return possibleTurns;
 
         int tempSize = 0;
         int breakPoint = 5_000_000;
@@ -790,7 +820,7 @@ public class Game {
     private int logAndResetState(String text, int tempSize, Player player, ArrayList<Turn> possibleTurns, int[][] position) {
         setPiecesPosition(position);
         resetHasMoved(player);
-        System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
+//        System.out.println("(" + text + ") - " + (possibleTurns.size() - tempSize));
         return possibleTurns.size();
     }
     private void setPiecesPosition(int[][] position) {
@@ -897,22 +927,6 @@ public class Game {
                 if (piece.getXPos() == -1 || piece.getType() == PieceType.guard || piece.getOvergrownTimer() > 0) continue;
                 if (dataOfSpell.mageType == piece.getType() && dataOfSpell.cost <= availableTokens) {
                     TurnSpell baseVariation = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
-                    if (board[piece.getXPos()][piece.getYPos()].getPiece() == null) {
-                        System.out.println("Piece and Board are not adding up - ms" + maxSpells);
-                        printBoardPieces();
-                        System.out.println("Previous spell:");
-                        System.out.println(spellData[currentCombination.getFirst().spellDataIndex].name + " - (" + currentCombination.getFirst().xFrom + ", " + currentCombination.getFirst().yFrom + ") - " + currentCombination.getFirst().getTargetsString());
-                        System.out.println("This spell:");
-                        System.out.println(spellData[baseVariation.spellDataIndex].name + " - (" + baseVariation.xFrom + ", " + baseVariation.yFrom + ") - " + baseVariation.getTargetsString());
-                        System.out.println("\nPlayer0");
-                        for (Piece p: getPlayer(false).getPieces()) {
-                            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
-                        }
-                        System.out.println("\nPlayer1");
-                        for (Piece p: getPlayer(true).getPieces()) {
-                            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
-                        }
-                    }
                     allVariations = generateVariations(baseVariation);
                     allVariations.removeIf(variation -> variation.targets.isEmpty());
 

@@ -4,6 +4,7 @@ public class MCTS {
 
     int TIME_LIMIT = 5000; // Time limit in milliseconds
     public int games_simulated = 0;
+    public double average_len_game = 0;
 
     public Turn findBestMove(Game game, boolean player) {
         Node root = new Node(game, null, player);
@@ -16,8 +17,9 @@ public class MCTS {
             }
             Node nodeToSimulate = selectedNode.getChildren().isEmpty() ? selectedNode : selectedNode.select();
             double simulationResult = nodeToSimulate.simulate();
-            nodeToSimulate.backpropagate(simulationResult);
             games_simulated++;
+            average_len_game = (average_len_game * (games_simulated - 1) + nodeToSimulate.getGameState().getTurnCounter()) / games_simulated;
+            nodeToSimulate.backpropagate(simulationResult);
         }
 
         Node bestChild = root.getChildren().stream()

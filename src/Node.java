@@ -34,13 +34,13 @@ public class Node {
     }
 
     public void expand() {
-        for (int col = 0; col < 7; col++) {
-            if (gameState.load_free_spaces()[col] >= 0) {
-                Game newGameState = new Game();
-                copyGameState(newGameState, gameState);
-                newGameState.makeMove(col);
-                children.add(new Node(newGameState, this, -player));
-            }
+        Player p = gameState.getPlayer(player);
+        for (Turn turn: gameState.generatePossibleTurns(p)) {
+            Game newGameState = new Game();
+            copyGameState(newGameState, gameState);
+            p = newGameState.getPlayer(player);
+            newGameState.executeTurn(turn, p, null);
+            children.add(new Node(newGameState, this, !player));
         }
     }
 
@@ -48,24 +48,24 @@ public class Node {
         Game simGameState = new Game();
         copyGameState(simGameState, gameState);
         Random random = new Random();
-        int currentPlayer = player;
+        boolean currentPlayer = player;
 
-        while (simGameState.isGameRunning()) {
-            int[] freeCols = simGameState.load_free_spaces();
-            ArrayList<Integer> availableMoves = new ArrayList<>();
-            for (int col = 0; col < 7; col++) {
-                if (freeCols[col] >= 0) {
-                    availableMoves.add(col);
-                }
+        while (simGameState.isGameOver() == 2) {
+            Player p = simGameState.getPlayer(currentPlayer);
+            List<Turn> possibleTurns = simGameState.generatePossibleTurns(p);
+
+            if (!possibleTurns.isEmpty()) {
+                Turn turn = possibleTurns.get(random.nextInt(possibleTurns.size()));
+                simGameState.executeTurn(turn, p, null);
             }
-            int move = availableMoves.get(random.nextInt(availableMoves.size()));
-            simGameState.makeMove(move);
-            currentPlayer = -currentPlayer; // Switch player after move
+
+            currentPlayer = !currentPlayer; // Switch player after move
         }
-        if (simGameState.hasPlayerWon(simGameState.load_p1_grid())) {
-            return this.player == 1 ? 1 : -1;
-        } else if (simGameState.hasPlayerWon(simGameState.load_p2_grid())) {
-            return this.player == -1 ? 1 : -1;
+
+        if (simGameState.isGameOver() == 0) {
+            return player ? 1 : -1;
+        } else if (simGameState.isGameOver() == 1) {
+            return player ? -1 : 1;
         } else {
             return 0;
         }
@@ -97,28 +97,8 @@ public class Node {
     }
 
     private void copyGameState(Game target, Game source) {
-        boolean[][] p1Grid = new boolean[6][7];
-        boolean[][] p2Grid = new boolean[6][7];
-        int[] freeSpaceCols = new int[7];
-        String gameKey = source.load_gameKey();
-        boolean isP1Human = source.isP1Human;
-        boolean isP2Human = source.isP2Human;
-
-        for (int i = 0; i < 6; i++) {
-            for (int j = 0; j < 7; j++) {
-                p1Grid[i][j] = source.load_p1_grid()[i][j];
-                p2Grid[i][j] = source.load_p2_grid()[i][j];
-            }
-        }
-
-        for (int i = 0; i < 7; i++) {
-            freeSpaceCols[i] = source.load_free_spaces()[i];
-        }
-
-        target.store_p1_grid(p1Grid, freeSpaceCols);
-        target.store_p2_grid(p2Grid, freeSpaceCols);
-        target.setPlayerModes(isP1Human ? "Human" : "MCTS", isP2Human ? "Human" : "MCTS");
-        target.setGameKey(gameKey);
+        Game copiedState = source.copyGameState();
+        target.loadGameState(copiedState);
     }
 
     public List<Node> getChildren() {
