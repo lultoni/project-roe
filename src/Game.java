@@ -38,7 +38,7 @@ public class Game {
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true),
                 new Piece(PieceType.guard, true)};
-        player0 = new Player(p0p, true);
+        player0 = new Player(p0p, false);
         player1 = new Player(p1p, false);
         setPiecesStart();
 
@@ -177,8 +177,11 @@ public class Game {
         double okayTerrain = goodTerrain * 0.5;
         double badTerrain = okayTerrain * 0.5;
 
+        score += p.getSpellTokens() * spellTokenValue;
+        boolean isGuardProtected = false;
+
         for (Piece piece: p.getPieces()) {
-            if (piece.getXPos() != -1) {
+            if (piece.getXPos() != -1 && piece.getOvergrownTimer() == 0) {
                 boolean isMage = piece.getType() != PieceType.guard;
                 int pta = pieceTerrainAdvantage(piece.getXPos(), piece.getYPos());
                 switch (pta) {
@@ -187,32 +190,28 @@ public class Game {
                     case -1 -> score += badTerrain * ((isMage) ? mageScoreBoost : 1);
                 }
                 score += getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
-                score += p.getSpellTokens() * spellTokenValue;
-                boolean isGuardProtected = false;
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
                     if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer() && isMage) {
                         isGuardProtected = true;
                         if (piece.getType() == PieceType.spirit) score += guardProtectionBonus * 0.2;
                     }
                     if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction;
-                    if (isMage && pta != 1) switch (terrainAdvantage(piece, tile)) {
-                        case 1 -> score += goodTerrain * 0.05 * (piece.getType() == PieceType.air ? 2 : 1);
-                        case 0 -> score += okayTerrain * 0.05 * (piece.getType() == PieceType.air ? 2 : 1);
-                        case -1 -> score += badTerrain * 0.05 * (piece.getType() == PieceType.air ? 2 : 1);
+                    if (isMage && pta != 1) if (terrainAdvantage(piece, tile) == 1) {
+                        score += goodTerrain * 0.05;
                     }
                 }
-                if (isGuardProtected) score += guardProtectionBonus;
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
                     if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / 2;
-                    if (isMage && pta == 1) switch (terrainAdvantage(piece, tile)) {
-                        case 1 -> score += goodTerrain * 0.03;
-                        case 0 -> score += okayTerrain * 0.03;
-                        case -1 -> score += badTerrain * 0.03;
+                    if (isMage && pta == 1) if (terrainAdvantage(piece, tile) == 1) {
+                        score += goodTerrain * 0.05;
                     }
                 }
-                // TODO try to add a mageOpponent distance or something
             }
+            if (isGuardProtected) score += guardProtectionBonus;
         }
+
+        // TODO try to add a mageOpponent distance or something
+
         return score;
     }
 
@@ -325,66 +324,35 @@ public class Game {
     public boolean isLegalSpell(TurnSpell spell, Player player) {
         SpellData dataOfSpell = spellData[spell.spellDataIndex];
         Piece mage = board[spell.xFrom][spell.yFrom].getPiece();
-
-        System.out.println("\nChecking legality of spell: " + dataOfSpell.name);
-        System.out.println("Player spell tokens: " + player.getSpellTokens() + ", Spell cost: " + dataOfSpell.cost);
-
         if (player.getSpellTokens() < dataOfSpell.cost) return false;
         if (mage == null) {
-            System.out.println("No mage found at the starting position.");
             return false;
         } else {
-            System.out.println("Mage found: " + mage.getType());
             if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType || mage.getOvergrownTimer() > 0) {
-                System.out.println("Mage is either a guard, belongs to the wrong player, is not the right type, or is overgrown.");
                 return false;
             }
         }
 
-        System.out.println(dataOfSpell.spellType);
         switch (dataOfSpell.spellType) {
             case offense -> {
-                System.out.println("Offense spell type detected.");
-                if (spell.targets.isEmpty()) {
-                    System.out.println("Spell targets are empty. Returning false.");
-                    return false;
-                }
-
+                if (spell.targets.isEmpty()) return false;
                 int[] target = spell.targets.getFirst();
                 Piece targetPiece = board[target[0]][target[1]].getPiece();
-
-                System.out.println("Offensive spell target coordinates: " + Arrays.toString(target));
-                System.out.println("Target piece: " + (targetPiece != null ? targetPiece : "None"));
-                System.out.println("Target piece player: " + (targetPiece != null ? targetPiece.getPlayer() : "N/A"));
-                System.out.println("Target piece spell protected timer: " + (targetPiece != null ? targetPiece.getSpellProtectedTimer() : "N/A"));
-
-                boolean isLegal = spell.targets.size() == 1 && targetPiece != null && targetPiece.getPlayer() != mage.getPlayer() &&
+                return spell.targets.size() == 1 && targetPiece != null && targetPiece.getPlayer() != mage.getPlayer() &&
                         targetPiece.getSpellProtectedTimer() == 0 && isSpellPathFree(spell);
-
-                System.out.println("Spell legality: " + isLegal);
-                return isLegal;
             }
-            case defense -> {
-                System.out.println("defense");
-                if (spell.targets.isEmpty()){
-                    System.out.println("empty targets - true");
-                    return true;
-                }
+            case defense -> { // TODO recasting of defense spells yes or no...
+                if (spell.targets.isEmpty()) return true;
                 int[] target = spell.targets.getFirst();
-                System.out.println("Defensive spell target: " + Arrays.toString(target));
-                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null && board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer() &&
-                        board[target[0]][target[1]].getPiece().getAttackProtectedTimer() == 0 &&
-                        board[target[0]][target[1]].getPiece().getSpellProtectedTimer() == 0 &&
-                        board[target[0]][target[1]].getPiece().getSpellReflectionTimer() == 0;
+                return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null &&
+                        board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer();
             }
             case utility -> {
-                System.out.println("utility - " + dataOfSpell.mageType);
                 switch (dataOfSpell.mageType) {
                     case fire -> {
                         // (1)(2)(3)
                         // (2)
                         // (3)
-                        System.out.println("Fire utility spell targets: " + spell.targets);
                         return spell.targets.size() == 3 &&
                                 board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
                                 board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() == null &&
@@ -395,13 +363,11 @@ public class Game {
                                         (spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[0] - 2));
                     }
                     case water -> {
-                        System.out.println("Water utility spell is always legal.");
                         return true;
                     }
                     case earth -> {
                         // (1)(2)
                         // (3)(4)
-                        System.out.println("Earth utility spell targets: " + spell.targets);
                         return spell.targets.size() == 4 &&
                                 (spell.targets.get(0)[0] == spell.targets.get(2)[0] &&
                                         spell.targets.get(1)[0] == spell.targets.get(3)[0] &&
@@ -413,12 +379,11 @@ public class Game {
                                         spell.targets.get(1)[1] == spell.targets.get(3)[1] - 1);
                     }
                     case air -> {
-                        System.out.println("Air utility spell targets: " + spell.targets);
                         return spell.targets.size() == 1 && board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
-                                Math.abs(spell.targets.getFirst()[0] - spell.xFrom) == 1 && Math.abs(spell.targets.getFirst()[1] - spell.xFrom) == 1;
+                                Math.abs(spell.targets.getFirst()[0] - spell.xFrom) == 1 && Math.abs(spell.targets.getFirst()[1] - spell.xFrom) == 1 &&
+                                board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getBlockedTimer() == 0;
                     }
                     case spirit -> {
-                        System.out.println("Spirit utility spell targets: " + spell.targets);
                         return spell.targets.size() == 2 && board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() != null &&
                                 board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() != null &&
                                 board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece().getPlayer() == mage.getPlayer() &&
@@ -442,76 +407,48 @@ public class Game {
         int signXChange = (int) Math.signum(xChange);
         int signYChange = (int) Math.signum(yChange);
 
-        System.out.println("Checking spell path from (" + xFrom + ", " + yFrom + ") to (" + xTo + ", " + yTo + ")");
-        System.out.println("xChange: " + xChange + ", yChange: " + yChange);
-        System.out.println("absXChange: " + absXChange + ", absYChange: " + absYChange);
-        System.out.println("signXChange: " + signXChange + ", signYChange: " + signYChange);
-
         // Range 1
         if (absXChange <= 1 && absYChange <= 1) {
-            System.out.println("Range 1: Path is free");
             return true;
         }
 
         // Range 2
         if (absXChange <= 2 && absYChange <= 2) {
-            System.out.println("Range 2 detected");
             if (absXChange == 2 && absYChange == 2) {
                 Piece potentialGuard = board[signXChange + xFrom][signYChange + yFrom].getPiece();
-                System.out.println("Checking potential guard at (" + (signXChange + xFrom) + ", " + (signYChange + yFrom) + ")");
                 return checkPotentialGuard(potentialGuard, xFrom, yFrom);
             } else if (absYChange == 2) {
                 Piece potentialGuard = board[xFrom][signYChange + yFrom].getPiece();
-                System.out.println("Checking potential guard at (" + xFrom + ", " + (signYChange + yFrom) + ")");
                 return checkPotentialGuard(potentialGuard, xFrom, yFrom);
             } else {
                 Piece potentialGuard = board[signXChange + xFrom][yFrom].getPiece();
-                System.out.println("Checking potential guard at (" + (signXChange + xFrom) + ", " + yFrom + ")");
                 return checkPotentialGuard(potentialGuard, xFrom, yFrom);
             }
         }
 
         // Range 3
         if (absXChange <= 3 && absYChange <= 3) {
-            System.out.println("Range 3 detected");
             if (absXChange == 3 && absYChange == 3 || absXChange == 3 && absYChange == 2 || absXChange == 2) {
                 Piece potentialGuard1 = board[signXChange + xFrom][signYChange + yFrom].getPiece();
                 Piece potentialGuard2 = board[2 * signXChange + xFrom][2 * signYChange + yFrom].getPiece();
-                System.out.println("Checking potential guards at (" + (signXChange + xFrom) + ", " + (signYChange + yFrom) + ") and (" + (2 * signXChange + xFrom) + ", " + (2 * signYChange + yFrom) + ")");
                 return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
             } else if (absXChange == 0 || absXChange == 1) {
                 Piece potentialGuard1 = board[xFrom][signYChange + yFrom].getPiece();
                 Piece potentialGuard2 = board[xFrom][2 * signYChange + yFrom].getPiece();
-                System.out.println("Checking potential guards at (" + xFrom + ", " + (signYChange + yFrom) + ") and (" + xFrom + ", " + (2 * signYChange + yFrom) + ")");
                 return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
             } else if ((absXChange == 3 && absYChange == 0) || (absXChange == 3 && absYChange == 1)) {
                 Piece potentialGuard1 = board[signXChange + xFrom][yFrom].getPiece();
                 Piece potentialGuard2 = board[2 * signXChange + xFrom][yFrom].getPiece();
-                System.out.println("Checking potential guards at (" + (signXChange + xFrom) + ", " + yFrom + ") and (" + (2 * signXChange + xFrom) + ", " + yFrom + ")");
                 return checkPotentialGuard(potentialGuard1, xFrom, yFrom) && checkPotentialGuard(potentialGuard2, xFrom, yFrom);
             }
         }
 
         // Not in the range of the mage
-        System.out.println("Path is not free");
         return false;
     }
 
     private boolean checkPotentialGuard(Piece potentialGuard, int xFrom, int yFrom) {
-        System.out.println("Checking potential guard at (" + xFrom + ", " + yFrom + ")");
-        if (potentialGuard == null) {
-            System.out.println("No potential guard found");
-            return true;
-        } else if (potentialGuard.getType() != PieceType.guard) {
-            System.out.println("Potential guard is not of type guard");
-            return true;
-        } else if (potentialGuard.getPlayer() == board[xFrom][yFrom].getPiece().getPlayer()) {
-            System.out.println("Potential guard belongs to the same player");
-            return true;
-        } else {
-            System.out.println("Potential guard blocks the path");
-            return false;
-        }
+        return potentialGuard == null || potentialGuard.getType() != PieceType.guard || potentialGuard.getPlayer() == board[xFrom][yFrom].getPiece().getPlayer();
     }
 
 
@@ -566,42 +503,45 @@ public class Game {
         // m a x
         position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleAttacks = generatePossibleAttacks(player);
             if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
                 if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, attack, null));
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m a x", tempSize, player, possibleTurns, position);
 
         // m x s
         position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleSpellCombinations = generatePossibleSpellCombinations(player);
             if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
                 if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, null, spells));
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m x s", tempSize, player, possibleTurns, position);
 
         // m a s
         position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleAttacks = generatePossibleAttacks(player);
             if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-                Piece piece = storePieceOfAttack(attack);
+                Piece piece2 = storePieceOfAttack(attack);
                 Object[] guardPosition = doAttack(attack);
                 possibleSpellCombinations = generatePossibleSpellCombinations(player);
                 if (!possibleSpellCombinations.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
                     if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, null, null, attack, spells));
                 }
-                undoAttack(attack, piece, guardPosition);
+                undoAttack(attack, piece2, guardPosition);
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m a s", tempSize, player, possibleTurns, position);
 
@@ -609,12 +549,13 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<Move> possibleMovesAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
                 if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, null, null));
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m m x x", tempSize, player, possibleTurns, position);
 
@@ -622,17 +563,19 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<Attack> possibleAttacksAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
                 doMove(move2, false);
                 possibleAttacksAfterMove1 = generatePossibleAttacks(player);
                 if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
                     if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, attack, null));
                 }
-                undoMove(move2);
+                undoMove(move2, piece2);
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m m a x", tempSize, player, possibleTurns, position);
 
@@ -640,43 +583,48 @@ public class Game {
         position = fetchPositionPieces();
         ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
                 doMove(move2, false);
                 possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                 if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
                     if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, null, spells));
                 }
-                undoMove(move2);
+                undoMove(move2, piece2);
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m m x s", tempSize, player, possibleTurns, position);
 
         // m m a s
         position = fetchPositionPieces();
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
+            Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
+                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
                 doMove(move2, false);
                 possibleAttacksAfterMove1 = generatePossibleAttacks(player);
                 if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
-                    Piece piece = storePieceOfAttack(attack);
+                    Piece piece3 = storePieceOfAttack(attack);
                     Object[] guardPosition = doAttack(attack);
                     possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove1.isEmpty()) for (ArrayList<TurnSpell> spells: possibleSpellsAfterMove1) {
                         if (possibleTurns.size() - tempSize <= breakPoint) possibleTurns.add(new Turn(move, move2, null, attack, spells));
                     }
-                    undoAttack(attack, piece, guardPosition);
+                    undoAttack(attack, piece3, guardPosition);
                 }
-                undoMove(move2);
+                undoMove(move2, piece2);
             }
-            undoMove(move);
+            undoMove(move, piece);
         }
         tempSize = logAndResetState("m m a s", tempSize, player, possibleTurns, position);
 
+//        // TODO add piece to undoMove when rejoining this bit
 //        // m m m x x
 //        position = fetchPositionPieces();
 //        ArrayList<Move> possibleMovesAfterMove2;
@@ -874,8 +822,7 @@ public class Game {
         return board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
     }
 
-    private void undoMove(Move move) {
-        Piece piece = board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece();
+    private void undoMove(Move move, Piece piece) {
         setPiece(move.xFrom, move.yFrom, piece);
         setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, null);
         piece.setHasMoved(false);
@@ -897,7 +844,7 @@ public class Game {
         for (int spellIndex = 0; spellIndex < spellData.length; spellIndex++) {
             SpellData dataOfSpell = spellData[spellIndex];
             for (Piece piece : player.getPieces()) {
-                if (piece.getXPos() == -1 || piece.getType() == PieceType.guard) continue;
+                if (piece.getXPos() == -1 || piece.getType() == PieceType.guard || piece.getOvergrownTimer() > 0) continue;
                 if (dataOfSpell.mageType == piece.getType() && dataOfSpell.cost <= availableTokens) {
                     TurnSpell baseVariation = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
                     allVariations = generateVariations(baseVariation);
@@ -1032,7 +979,7 @@ public class Game {
                             }
                         }
                     }
-                    case air -> {
+                    case air -> { // TODO bugfix this
                         for (int[] tilePosition: getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, 1)) {
                             Tile tile = board[tilePosition[0]][tilePosition[1]];
                             if (tile.getPiece() != null) continue;
@@ -1102,11 +1049,13 @@ public class Game {
             piece.setAttackProtectedTimer(Math.max(piece.getAttackProtectedTimer() - 0.25, 0));
             piece.setSpellProtectedTimer(Math.max(piece.getSpellProtectedTimer() - 0.25, 0));
             piece.setSpellReflectionTimer(Math.max(piece.getSpellReflectionTimer() - 0.25, 0));
+            piece.setOvergrownTimer(Math.max(piece.getOvergrownTimer() - 0.25, 0));
         }
         for (Piece piece: player0.getPieces()) {
             piece.setAttackProtectedTimer(Math.max(piece.getAttackProtectedTimer() - 0.25, 0));
             piece.setSpellProtectedTimer(Math.max(piece.getSpellProtectedTimer() - 0.25, 0));
             piece.setSpellReflectionTimer(Math.max(piece.getSpellReflectionTimer() - 0.25, 0));
+            piece.setOvergrownTimer(Math.max(piece.getOvergrownTimer() - 0.25, 0));
         }
     }
 
@@ -1116,10 +1065,10 @@ public class Game {
         }
     }
 
-    public ArrayList<Move> generatePossibleMoves(Player player) { // TODO inferno and rock slide status
+    public ArrayList<Move> generatePossibleMoves(Player player) {
         ArrayList<Move> possibleMoves = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
-            if (piece.getXPos() == -1) continue;
+            if (piece.getXPos() == -1 || piece.getOvergrownTimer() > 0) continue;
             int xPos = piece.getXPos();
             int yPos = piece.getYPos();
             int range = getMovementRange(xPos, yPos);
@@ -1145,7 +1094,7 @@ public class Game {
     public ArrayList<Attack> generatePossibleAttacks(Player player) {
         ArrayList<Attack> possibleAttacks = new ArrayList<>();
         for (Piece piece : player.getPieces()) {
-            if (piece.getXPos() == -1) continue;
+            if (piece.getXPos() == -1 || piece.getOvergrownTimer() > 0) continue;
             int xPos = piece.getXPos();
             int yPos = piece.getYPos();
             int range = 1;
@@ -1177,12 +1126,17 @@ public class Game {
         return (advantage == 1) ? 3 : (advantage == 0) ? 2 : 1;
     }
 
-    public void doMove(Move move, boolean debug) { // TODO inferno effect
+    public void doMove(Move move, boolean debug) {
         if (move != null) {
             if (!isLegalMove(move, debug)) throw new IllegalArgumentException("The Move that was provided is not Legal.\nxFrom: " + move.xFrom + "\nyFrom: " + move.yFrom + "\nxChange: " + move.xChange + "\nyChange: " + move.yChange);
             Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, piece);
-            setPiece(move.xFrom, move.yFrom, null);
+            if (board[move.xFrom + move.xChange][move.yFrom + move.yChange].getDeathTimer() > 0) {
+                piece.setPosition(-1, -1);
+                setPiece(move.xFrom, move.yFrom, null);
+            } else {
+                setPiece(move.xFrom + move.xChange, move.yFrom + move.yChange, piece);
+                setPiece(move.xFrom, move.yFrom, null);
+            }
             if (!debug) piece.setHasMoved(true);
         }
     }
@@ -1291,25 +1245,26 @@ public class Game {
         return closestGuard;
     }
 
-    public boolean isLegalAttack(Attack attack) { // TODO spell effects need to be considered
+    public boolean isLegalAttack(Attack attack) {
         if (attack == null) return true;
+        if (board[attack.xFrom][attack.yFrom].getPiece().getOvergrownTimer() > 0) return false;
         int range = getMovementRange(attack.xFrom, attack.yFrom);
         if (range == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 0 && Math.abs(attack.yChange) == 1 || Math.abs(attack.xChange) == 1 && Math.abs(attack.yChange) == 0) {
             Piece attackingPiece = board[attack.xFrom][attack.yFrom].getPiece();
             Piece defendingPiece = board[attack.xFrom + attack.xChange][attack.yFrom + attack.yChange].getPiece();
-            return defendingPiece != null && defendingPiece.getPlayer() != attackingPiece.getPlayer();
+            return defendingPiece != null && defendingPiece.getPlayer() != attackingPiece.getPlayer() && defendingPiece.getAttackProtectedTimer() == 0;
         }
         return false;
     }
 
-    public boolean isLegalMove(Move move, boolean debug) { // TODO spell effects need to be considered
+    public boolean isLegalMove(Move move, boolean debug) {
         if (move == null) return true;
-        if (board[move.xFrom][move.yFrom].getPiece().hasMoved() && !debug) return false;
+        if ((board[move.xFrom][move.yFrom].getPiece().hasMoved() || board[move.xFrom][move.yFrom].getPiece().getOvergrownTimer() > 0) && !debug) return false;
         int range = getMovementRange(move.xFrom, move.yFrom);
         if (range == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 0 && Math.abs(move.yChange) == 1 || Math.abs(move.xChange) == 1 && Math.abs(move.yChange) == 0) {
-            return board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null;
+            return board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null && board[move.xFrom + move.xChange][move.yFrom + move.yChange].getBlockedTimer() == 0;
         } else {
-            return Math.abs(move.xChange) <= range && Math.abs(move.yChange) <= range && board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null && isNoPieceBetween(move);
+            return Math.abs(move.xChange) <= range && Math.abs(move.yChange) <= range && board[move.xFrom + move.xChange][move.yFrom + move.yChange].getPiece() == null && board[move.xFrom + move.xChange][move.yFrom + move.yChange].getBlockedTimer() == 0 && isNoPieceBetween(move);
         }
     }
 
@@ -1504,6 +1459,7 @@ public class Game {
         copiedPiece.setAttackProtectedTimer(originalPiece.getAttackProtectedTimer());
         copiedPiece.setSpellProtectedTimer(originalPiece.getSpellProtectedTimer());
         copiedPiece.setSpellReflectionTimer(originalPiece.getSpellReflectionTimer());
+        copiedPiece.setOvergrownTimer(originalPiece.getOvergrownTimer());
         return copiedPiece;
     }
 
@@ -1529,6 +1485,7 @@ public class Game {
             originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
             originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
             originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
+            originalPiece.setOvergrownTimer(loadedPiece.getOvergrownTimer());
         }
         player0.setSpellTokens(gameState.player0.getSpellTokens());
 
@@ -1542,6 +1499,7 @@ public class Game {
             originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
             originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
             originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
+            originalPiece.setOvergrownTimer(loadedPiece.getOvergrownTimer());
         }
         player1.setSpellTokens(gameState.player1.getSpellTokens());
 

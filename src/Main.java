@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 public class Main {
     public static void main(String[] args) {
         System.out.println("Boot - [project-roe]\n");
@@ -53,6 +55,16 @@ public class Main {
 //                "Spells:\n" +
 //                "TurnSpell(0, 3, 5, [(2, 2)])\n" +
 //                "}");
+
+//        ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(false));
+//        System.out.println("\nPlayer0");
+//        for (Piece p: game.getPlayer(false).getPieces()) {
+//            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
+//        }
+//        System.out.println("\nPlayer1");
+//        for (Piece p: game.getPlayer(true).getPieces()) {
+//            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
+//        }
 
         System.out.println("\n\n---Starting Game---");
         game.startGame(window);

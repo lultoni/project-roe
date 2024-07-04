@@ -6,7 +6,7 @@ public class Piece {
     private double spellProtectedTimer;
     private double spellReflectionTimer;
     private double attackProtectedTimer;
-    private double overgrownTimer; // TODO updateTimer, legal attack/movement, copy game
+    private double overgrownTimer;
     private boolean hasMoved;
 
     public Piece(PieceType type, boolean player) {

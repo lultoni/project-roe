@@ -21,23 +21,47 @@ public class SpellData {
                 int y = spell.targets.getFirst()[1];
                 switch (mageType) {
                     case fire -> {
+                        boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
                         removePiece(board, x, y);
                         setInfernoEffect(board, x, y, 0.75);
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            removePiece(board, spell.xFrom, spell.yFrom);
+                            setInfernoEffect(board, spell.xFrom, spell.yFrom, 0.75);
+                        }
                     }
-                    case water -> removePiece(board, x, y);
-                    case earth -> {
+                    case water -> {
+                        boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
                         removePiece(board, x, y);
-                        setBlockedEffect(board, x, y, 1.75);
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            removePiece(board, spell.xFrom, spell.yFrom);
+                        }
+                    }
+                    case earth -> {
+                        boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
+                        removePiece(board, x, y);
+                        setBlockedEffect(board, x, y);
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            removePiece(board, spell.xFrom, spell.yFrom);
+                        }
                     }
                     case air -> { // TODO test
+                        boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
                         removePiece(board, x, y);
                         pushBackAirOffense(board, x, y, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 1 : -1);
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            removePiece(board, spell.xFrom, spell.yFrom);
+                            pushBackAirOffense(board, spell.xFrom, spell.yFrom, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? -1 : 1);
+                        }
                     }
                     case spirit -> {
+                        boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
                         removePiece(board, x, y);
-                        if (otherPlayer.getSpellTokens() > 0) {
+                        if (otherPlayer.getSpellTokens() > 0 && !(isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0)) {
                             otherPlayer.setSpellTokens(otherPlayer.getSpellTokens() - 1);
                             player.setSpellTokens(player.getSpellTokens() + 1);
+                        }
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            removePiece(board, spell.xFrom, spell.yFrom);
                         }
                     }
                 }
@@ -55,26 +79,68 @@ public class SpellData {
                     case air -> reflectProtect(board, spell.xFrom, spell.yFrom, x, y);
                 }
             }
-            case utility -> { // TODO
+            case utility -> { // TODO test
                 switch (mageType) {
                     case fire -> {
-
+                        for (int[] t: spell.targets) {
+                            setInfernoEffect(board, t[0], t[1], 1.75);
+                        }
                     }
                     case water -> {
-
+                        int direction = (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 2 : -2;
+                        boolean isSpellReflecting = false;
+                        for (int[] t: spell.targets) {
+                            if (board[t[0]][t[1]].getPiece().getSpellReflectionTimer() > 0) {
+                                isSpellReflecting = true;
+                            }
+                            if (board[t[0]][t[1]].getPiece().getSpellProtectedTimer() == 0) pushBackPiece(board, t[0], t[1], direction);
+                        }
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) pushBackPiece(board, spell.xFrom, spell.yFrom, -direction);
                     }
                     case earth -> {
-
+                        boolean isSpellReflecting = false;
+                        for (int[] t: spell.targets) {
+                            if (board[t[0]][t[1]].getPiece().getSpellReflectionTimer() > 0) {
+                                isSpellReflecting = true;
+                            }
+                            if (board[t[0]][t[1]].getPiece().getSpellProtectedTimer() == 0) givePieceOvergrown(board, t[0], t[1]);
+                        }
+                        if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) givePieceOvergrown(board, spell.xFrom, spell.yFrom);
                     }
                     case air -> {
-
+                        int x = spell.targets.getFirst()[0];
+                        int y = spell.targets.getFirst()[0];
+                        Piece piece = board[spell.xFrom][spell.yFrom].getPiece();
+                        if (board[x][y].getDeathTimer() > 0) {
+                            piece.setPosition(-1, -1);
+                            setPiece(board, spell.xFrom, spell.yFrom, null);
+                        } else {
+                            setPiece(board, x, y, piece);
+                            setPiece(board, spell.xFrom, spell.yFrom, null);
+                        }
                     }
                     case spirit -> {
-
+                        int x1 = spell.targets.getFirst()[0];
+                        int y1 = spell.targets.getFirst()[1];
+                        Piece p1 = board[x1][y1].getPiece();
+                        int x2 = spell.targets.getLast()[0];
+                        int y2 = spell.targets.getLast()[1];
+                        Piece p2 = board[x2][y2].getPiece();
+                        setPiece(board, x2, y2, p1);
+                        setPiece(board, x1, y1, p2);
                     }
                 }
             }
         }
+    }
+
+    private void setPiece(Tile[][] board, int x, int y, Piece piece) {
+        if (x >= 0 && x < 8 && y >= 0 && y < 8) board[x][y].setPiece(piece);
+        if (piece != null) piece.setPosition(x, y);
+    }
+
+    private void givePieceOvergrown(Tile[][] board, int x, int y) {
+        if (board[x][y].getPiece().getSpellProtectedTimer() == 0) board[x][y].getPiece().setOvergrownTimer(1);
     }
 
     private void reflectProtect(Tile[][] board, int xFrom, int yFrom, int x, int y) {
@@ -92,7 +158,7 @@ public class SpellData {
         board[x][y].getPiece().setAttackProtectedTimer(1);
     }
 
-    private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) {
+    private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) { // TODO blocked/death
         int[] sequence = new int[8];
         if (direction == 1) {
             // Direction 1: (8)(7)(6)
@@ -116,7 +182,7 @@ public class SpellData {
         }
     }
 
-    private void pushBackPiece(Tile[][] board, int x, int y, int direction) {
+    private void pushBackPiece(Tile[][] board, int x, int y, int direction) { // TODO blocked/death
         Piece piece = board[x][y].getPiece();
         int newPosY = y + direction;
         for (int i = (int) (y + Math.signum(direction)); i != newPosY; i += (int) (Math.signum(direction))) {
@@ -148,8 +214,8 @@ public class SpellData {
     }
 
 
-    private void setBlockedEffect(Tile[][] board, int x, int y, double timer) {
-        board[x][y].setBlockedTimer(timer);
+    private void setBlockedEffect(Tile[][] board, int x, int y) {
+        board[x][y].setBlockedTimer(1.75);
     }
 
     private void setInfernoEffect(Tile[][] board, int x, int y, double timer) {
