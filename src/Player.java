@@ -22,50 +22,13 @@ public class Player {
                 Thread.onSpinWait();
             }
             return game.getHumanTurn();
-        } else { // TODO think of how you can create MCTS for this game
-            double bestScore = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-            ArrayList<Turn> bestTurns = new ArrayList<>();
-            Game gameState = game.copyGameState();
-
-            System.out.println("---pos_turns len " + possibleTurns.size());
-            System.out.println("cur turn " + ((game.getTurnCounter() % 1 == 0) ? "0" : "1"));
-
-            for (Turn turn : possibleTurns) {
-                game.executeTurn(turn, game.getPlayer(game.getTurnCounter() % 1 != 0), null);
-                game.setTurnCounter(game.getTurnCounter() - 0.5);
-                double score = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-
-                try {
-                    score = game.evaluate();
-                } catch (Exception e) {
-                    System.out.println("I am the little bitch that thinks it's funny to throw errors:");
-                    turn.print();
-                }
-
-                if (game.getTurnCounter() % 1 == 0) {
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestTurns.clear();
-                        bestTurns.add(turn);
-                    } else if (score == bestScore) {
-                        bestTurns.add(turn);
-                    }
-                } else {
-                    if (score < bestScore) { // TODO no way this ai ain't retarded bruh, like win the game!!!
-                        bestScore = score;
-                        bestTurns.clear();
-                        bestTurns.add(turn);
-                    } else if (score == bestScore) {
-                        bestTurns.add(turn);
-                    }
-                }
-                game.loadGameState(gameState);
-            }
-
-            System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");
-
-            Random random = new Random();
-            return bestTurns.get(random.nextInt(bestTurns.size()));
+        } else {
+            MCTS mcts = new MCTS();
+            System.out.println("\nthinking for (expected) " + mcts.TIME_LIMIT + " ms");
+            boolean is_p0 = game.getTurnCounter() % 1 != 0;
+            Turn bestTurn = mcts.findBestMove(game, is_p0);
+            System.out.println("games_simulated: " + mcts.games_simulated);
+            return bestTurn;
         }
     }
 

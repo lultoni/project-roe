@@ -12,6 +12,7 @@ public class Game {
     private final SpellData[] spellData;
     private boolean waitingForHuman;
     private Turn humanTurn;
+    private Turn lastTurn;
     private boolean printDebug;
 
     public Game() {
@@ -66,6 +67,7 @@ public class Game {
         waitingForHuman = false;
         humanTurn = null;
         printDebug = false;
+        lastTurn = null;
     }
 
     private void loadMap() {
@@ -254,7 +256,7 @@ public class Game {
     }
 
 
-    private int isGameOver() {
+    public int isGameOver() {
         // Win p0 = 0
         // Win p1 = 1
         // Draw = -1
@@ -320,6 +322,7 @@ public class Game {
         }
         updateTimers();
         turnCounter += 0.5;
+        lastTurn = turn;
     }
 
     private void castSpell(TurnSpell spell, Player player) {
@@ -1509,6 +1512,8 @@ public class Game {
 
         // Current Turn
         gameState.turnCounter = turnCounter;
+        gameState.humanTurn = humanTurn;
+        gameState.lastTurn = lastTurn;
 
         return gameState;
     }
@@ -1591,6 +1596,8 @@ public class Game {
 
         // Load current turn counter
         this.turnCounter = gameState.turnCounter;
+        this.humanTurn = gameState.humanTurn;
+        this.lastTurn = gameState.lastTurn;
     }
 
     public double getTurnCounter() {
@@ -1612,6 +1619,14 @@ public class Game {
     public void setHumanTurn(Turn turn) {
         humanTurn = turn;
         waitingForHuman = false;
+    }
+
+    public Turn getLastTurn() {
+        return lastTurn;
+    }
+
+    public void setLastTurn(Turn lastTurn) {
+        this.lastTurn = lastTurn;
     }
 
     public void doDBT(Window window, String turnStr) {
