@@ -33,7 +33,14 @@ public class Player {
             for (Turn turn : possibleTurns) {
                 game.executeTurn(turn, game.getPlayer(game.getTurnCounter() % 1 != 0), null);
                 game.setTurnCounter(game.getTurnCounter() - 0.5);
-                double score = game.evaluate();
+                double score = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+
+                try {
+                    score = game.evaluate();
+                } catch (Exception e) {
+                    System.out.println("I am the little bitch that thinks it's funny to throw errors:");
+                    turn.print();
+                }
 
                 if (game.getTurnCounter() % 1 == 0) {
                     if (score > bestScore) {

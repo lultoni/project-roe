@@ -49,8 +49,9 @@ public class SpellData {
                         removePiece(board, x, y);
                         pushBackAirOffense(board, x, y, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 1 : -1);
                         if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) {
+                            boolean b = board[spell.xFrom][spell.yFrom].getPiece().getPlayer();
                             removePiece(board, spell.xFrom, spell.yFrom);
-                            pushBackAirOffense(board, spell.xFrom, spell.yFrom, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? -1 : 1);
+                            pushBackAirOffense(board, spell.xFrom, spell.yFrom, (b) ? -1 : 1);
                         }
                     }
                     case spirit -> {
@@ -79,14 +80,14 @@ public class SpellData {
                     case air -> reflectProtect(board, spell.xFrom, spell.yFrom, x, y);
                 }
             }
-            case utility -> { // TODO test
+            case utility -> {
                 switch (mageType) {
-                    case fire -> {
+                    case fire -> { // TODO test
                         for (int[] t: spell.targets) {
                             setInfernoEffect(board, t[0], t[1], 1.75);
                         }
                     }
-                    case water -> {
+                    case water -> { // TODO test
                         int direction = (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 2 : -2;
                         boolean isSpellReflecting = false;
                         for (int[] t: spell.targets) {
@@ -97,9 +98,10 @@ public class SpellData {
                         }
                         if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) pushBackPiece(board, spell.xFrom, spell.yFrom, -direction);
                     }
-                    case earth -> {
+                    case earth -> { // TODO test
                         boolean isSpellReflecting = false;
                         for (int[] t: spell.targets) {
+                            if (board[t[0]][t[1]].getPiece() == null) continue;
                             if (board[t[0]][t[1]].getPiece().getSpellReflectionTimer() > 0) {
                                 isSpellReflecting = true;
                             }
@@ -109,7 +111,7 @@ public class SpellData {
                     }
                     case air -> {
                         int x = spell.targets.getFirst()[0];
-                        int y = spell.targets.getFirst()[0];
+                        int y = spell.targets.getFirst()[1];
                         Piece piece = board[spell.xFrom][spell.yFrom].getPiece();
                         if (board[x][y].getDeathTimer() > 0) {
                             piece.setPosition(-1, -1);
@@ -185,9 +187,19 @@ public class SpellData {
     private void pushBackPiece(Tile[][] board, int x, int y, int direction) { // TODO blocked/death
         Piece piece = board[x][y].getPiece();
         int newPosY = y + direction;
-        for (int i = (int) (y + Math.signum(direction)); i != newPosY; i += (int) (Math.signum(direction))) {
-            if (board[x][i].getPiece() != null) return;
+
+        // Check if newPosY is valid, if not, reduce it nearer to 0 by 1
+        while (!isValidPosition(x, newPosY)) {
+            direction -= (int) Math.signum(direction);
+            newPosY = y + direction;
         }
+
+        // Check if all positions in the path are empty
+        for (int i = y + (int) Math.signum(direction); i != newPosY; i += (int) Math.signum(direction)) {
+            if (!isValidPosition(x, i) || board[x][i].getPiece() != null) return;
+        }
+
+        // Check if the final position is valid and empty
         if (isValidPosition(x, newPosY) && board[x][newPosY].getPiece() == null) {
             board[x][newPosY].setPiece(piece);
             board[x][y].setPiece(null);

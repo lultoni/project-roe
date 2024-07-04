@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,6 +12,7 @@ public class Game {
     private final SpellData[] spellData;
     private boolean waitingForHuman;
     private Turn humanTurn;
+    private boolean printDebug;
 
     public Game() {
         board = new Tile[8][8];
@@ -63,6 +65,7 @@ public class Game {
 
         waitingForHuman = false;
         humanTurn = null;
+        printDebug = false;
     }
 
     private void loadMap() {
@@ -126,7 +129,7 @@ public class Game {
             ArrayList<Turn> possibleTurns = (p.getIsHuman()) ? null : generatePossibleTurns(p);
             waitingForHuman = p.getIsHuman();
             Turn turn = p.fetchTurn(possibleTurns, this);
-            System.out.println(((player) ? "Player1 Turn: (ST: " : "Player0 Turn:(ST: ") + p.getSpellTokens() + ")");
+            System.out.println(((player) ? "\nPlayer1 Turn: (ST: " : "\nPlayer0 Turn:(ST: ") + p.getSpellTokens() + ")");
             turn.print();
             executeTurn(turn, p, window);
             player = !player;
@@ -169,15 +172,16 @@ public class Game {
 
     private double evaluateHelper(Player p) {
         double score = 0;
-        double spellTokenValue = 7.5;
+        double spellTokenValue = 20;
         double mageScoreBoost = 1.3;
+        double protectedScoreBoost = 0.35;
         double enemyAdjacentReduction = 8.5;
         double guardProtectionBonus = 20;
         double goodTerrain = 100;
         double okayTerrain = goodTerrain * 0.5;
         double badTerrain = okayTerrain * 0.5;
 
-        score += p.getSpellTokens() * spellTokenValue;
+        score += p.getSpellTokens() * spellTokenValue * Math.max(-0.5 * Math.round(turnCounter - 0.5) + 3, 1);
         boolean isGuardProtected = false;
 
         for (Piece piece: p.getPieces()) {
@@ -195,24 +199,28 @@ public class Game {
                         isGuardProtected = true;
                         if (piece.getType() == PieceType.spirit) score += guardProtectionBonus * 0.2;
                     }
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction;
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / (piece.getAttackProtectedTimer() > 0 ? 2 : 1);
                     if (isMage && pta != 1) if (terrainAdvantage(piece, tile) == 1) {
                         score += goodTerrain * 0.05;
                     }
                 }
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
-                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / 2;
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / (piece.getAttackProtectedTimer() > 0 ? 4 : 2);
                     if (isMage && pta == 1) if (terrainAdvantage(piece, tile) == 1) {
                         score += goodTerrain * 0.05;
                     }
                 }
+                for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer() && tile.getPiece().getType() != PieceType.guard) score -= guardProtectionBonus  * ((piece.getSpellProtectedTimer() > 0 || piece.getSpellReflectionTimer() > 0) ? protectedScoreBoost : 2);
+                }
             }
-            if (isGuardProtected) score += guardProtectionBonus;
+            score += guardProtectionBonus * (isGuardProtected ? 1 : -0.5);
         }
 
         // TODO try to add a mageOpponent distance or something
-
-        return score;
+        Random random = new Random();
+        float randomFloat = 0.95f + (random.nextFloat() * (1.05f - 0.95f));
+        return score * randomFloat;
     }
 
     private ArrayList<Tile> getTilesInRange(int xPos, int yPos, int range) {
@@ -230,7 +238,7 @@ public class Game {
         return tilesInRange;
     }
 
-    private ArrayList<int[]> getTilePositionsInRange(int xPos, int yPos, int range) {
+    public ArrayList<int[]> getTilePositionsInRange(int xPos, int yPos, int range) {
         ArrayList<int[]> tilePositionsInRange = new ArrayList<>();
 
         for (int x = Math.max(0, xPos - range); x <= Math.min(board.length - 1, xPos + range); x++) {
@@ -280,35 +288,35 @@ public class Game {
     }
 
     public void executeTurn(Turn turn, Player player, Window window) {
-        int ms = 400;
-        doMove(turn.move1, false);
+        int ms = 2000;
         if (window != null && turn.move1 != null) {
             window.updateWindow();
             waiter(ms);
         }
-        doMove(turn.move2, false);
+        doMove(turn.move1, false);
         if (window != null && turn.move2 != null) {
             window.updateWindow();
             waiter(ms);
         }
-        doMove(turn.move3, false);
+        doMove(turn.move2, false);
         if (window != null && turn.move3 != null) {
             window.updateWindow();
             waiter(ms);
         }
+        doMove(turn.move3, false);
         resetHasMoved(player);
         updateTimers();
-        doAttack(turn.attack);
         if (window != null && turn.attack != null) {
             window.updateWindow();
             waiter(ms);
         }
+        doAttack(turn.attack);
         if (turn.spells != null) for (TurnSpell spell: turn.spells) {
-            castSpell(spell, player);
             if (window != null) {
                 window.updateWindow();
                 waiter(ms);
             }
+            castSpell(spell, player);
         }
         updateTimers();
         turnCounter += 0.5;
@@ -324,35 +332,61 @@ public class Game {
     public boolean isLegalSpell(TurnSpell spell, Player player) {
         SpellData dataOfSpell = spellData[spell.spellDataIndex];
         Piece mage = board[spell.xFrom][spell.yFrom].getPiece();
+
+        if (printDebug) System.out.println("\nChecking legality of spell: " + dataOfSpell.name);
+        if (printDebug) System.out.println("Player spell tokens: " + player.getSpellTokens() + ", Spell cost: " + dataOfSpell.cost);
+
         if (player.getSpellTokens() < dataOfSpell.cost) return false;
         if (mage == null) {
+            if (printDebug) System.out.println("No mage found at the starting position.");
             return false;
         } else {
+            if (printDebug) System.out.println("Mage found: " + mage.getType());
             if (mage.getType() == PieceType.guard || getPlayer(mage.getPlayer()) != player || mage.getType() != dataOfSpell.mageType || mage.getOvergrownTimer() > 0) {
+                if (printDebug) System.out.println("Mage is either a guard, belongs to the wrong player, is not the right type, or is overgrown.");
                 return false;
             }
         }
 
+        if (printDebug) System.out.println(dataOfSpell.spellType);
         switch (dataOfSpell.spellType) {
             case offense -> {
-                if (spell.targets.isEmpty()) return false;
+                if (printDebug) System.out.println("Offense spell type detected.");
+                if (spell.targets.isEmpty()) {
+                    if (printDebug) System.out.println("Spell targets are empty. Returning false.");
+                    return false;
+                }
+
                 int[] target = spell.targets.getFirst();
                 Piece targetPiece = board[target[0]][target[1]].getPiece();
-                return spell.targets.size() == 1 && targetPiece != null && targetPiece.getPlayer() != mage.getPlayer() &&
+
+                if (printDebug) System.out.println("Offensive spell target coordinates: " + spell.getTargetsString());
+                if (printDebug) System.out.println("Target piece: " + (targetPiece != null ? targetPiece : "None"));
+                if (printDebug) System.out.println("Target piece player: " + (targetPiece != null ? targetPiece.getPlayer() : "N/A"));
+                if (printDebug) System.out.println("Target piece spell protected timer: " + (targetPiece != null ? targetPiece.getSpellProtectedTimer() : "N/A"));
+
+                boolean isLegal = spell.targets.size() == 1 && targetPiece != null && targetPiece.getPlayer() != mage.getPlayer() &&
                         targetPiece.getSpellProtectedTimer() == 0 && isSpellPathFree(spell);
+
+                if (printDebug) System.out.println("Spell legality: " + isLegal);
+                return isLegal;
             }
-            case defense -> { // TODO recasting of defense spells yes or no...
-                if (spell.targets.isEmpty()) return true;
+            case defense -> {
+                if (printDebug) System.out.println("defense");
+                if (spell.targets.isEmpty()) {
+                    if (printDebug) System.out.println("empty targets - true");
+                    return true;
+                }
                 int[] target = spell.targets.getFirst();
+                if (printDebug) System.out.println("Defensive spell target: " + spell.getTargetsString());
                 return spell.targets.size() == 1 && board[target[0]][target[1]].getPiece() != null &&
                         board[target[0]][target[1]].getPiece().getPlayer() == mage.getPlayer();
             }
             case utility -> {
+                if (printDebug) System.out.println("utility - " + dataOfSpell.mageType);
                 switch (dataOfSpell.mageType) {
                     case fire -> {
-                        // (1)(2)(3)
-                        // (2)
-                        // (3)
+                        if (printDebug) System.out.println("Fire utility spell targets: " + spell.getTargetsString());
                         return spell.targets.size() == 3 &&
                                 board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
                                 board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() == null &&
@@ -363,11 +397,11 @@ public class Game {
                                         (spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[0] - 2));
                     }
                     case water -> {
+                        if (printDebug) System.out.println("Water utility spell is always legal.");
                         return true;
                     }
                     case earth -> {
-                        // (1)(2)
-                        // (3)(4)
+                        if (printDebug) System.out.println("Earth utility spell targets: " + spell.getTargetsString());
                         return spell.targets.size() == 4 &&
                                 (spell.targets.get(0)[0] == spell.targets.get(2)[0] &&
                                         spell.targets.get(1)[0] == spell.targets.get(3)[0] &&
@@ -379,11 +413,24 @@ public class Game {
                                         spell.targets.get(1)[1] == spell.targets.get(3)[1] - 1);
                     }
                     case air -> {
-                        return spell.targets.size() == 1 && board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
-                                Math.abs(spell.targets.getFirst()[0] - spell.xFrom) == 1 && Math.abs(spell.targets.getFirst()[1] - spell.xFrom) == 1 &&
-                                board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getBlockedTimer() == 0;
+                        if (printDebug) System.out.println("Air utility spell targets: " + spell.getTargetsString());
+
+                        int[] target = spell.targets.getFirst();
+                        Piece targetPiece = board[target[0]][target[1]].getPiece();
+
+                        if (printDebug) System.out.println("Target coordinates: " + Arrays.toString(target));
+                        if (printDebug) System.out.println("Target piece: " + (targetPiece != null ? targetPiece : "None"));
+                        if (printDebug) System.out.println("Distance from mage (x-axis): " + Math.abs(target[0] - spell.xFrom));
+                        if (printDebug) System.out.println("Distance from mage (y-axis): " + Math.abs(target[1] - spell.yFrom));
+
+                        boolean isLegal = spell.targets.size() == 1 && targetPiece == null &&
+                                Math.abs(target[0] - spell.xFrom) <= 1 && Math.abs(target[1] - spell.yFrom) <= 1;
+
+                        if (printDebug) System.out.println("Spell legality: " + isLegal);
+                        return isLegal;
                     }
                     case spirit -> {
+                        if (printDebug) System.out.println("Spirit utility spell targets: " + spell.getTargetsString());
                         return spell.targets.size() == 2 && board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() != null &&
                                 board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() != null &&
                                 board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece().getPlayer() == mage.getPlayer() &&
@@ -847,6 +894,22 @@ public class Game {
                 if (piece.getXPos() == -1 || piece.getType() == PieceType.guard || piece.getOvergrownTimer() > 0) continue;
                 if (dataOfSpell.mageType == piece.getType() && dataOfSpell.cost <= availableTokens) {
                     TurnSpell baseVariation = new TurnSpell(spellIndex, piece.getXPos(), piece.getYPos(), new ArrayList<>());
+                    if (board[piece.getXPos()][piece.getYPos()].getPiece() == null) {
+                        System.out.println("Piece and Board are not adding up - ms" + maxSpells);
+                        printBoardPieces();
+                        System.out.println("Previous spell:");
+                        System.out.println(spellData[currentCombination.getFirst().spellDataIndex].name + " - (" + currentCombination.getFirst().xFrom + ", " + currentCombination.getFirst().yFrom + ") - " + currentCombination.getFirst().getTargetsString());
+                        System.out.println("This spell:");
+                        System.out.println(spellData[baseVariation.spellDataIndex].name + " - (" + baseVariation.xFrom + ", " + baseVariation.yFrom + ") - " + baseVariation.getTargetsString());
+                        System.out.println("\nPlayer0");
+                        for (Piece p: getPlayer(false).getPieces()) {
+                            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
+                        }
+                        System.out.println("\nPlayer1");
+                        for (Piece p: getPlayer(true).getPieces()) {
+                            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
+                        }
+                    }
                     allVariations = generateVariations(baseVariation);
                     allVariations.removeIf(variation -> variation.targets.isEmpty());
 
@@ -895,7 +958,7 @@ public class Game {
             }
             case utility -> {
                 switch (dataOfSpell.mageType) {
-                    case fire -> { // TODO check why isn't used
+                    case fire -> {
                         // Horizontal 3x1
                         for (int[] tilePosition : getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, getSpellRange(baseVariation.xFrom, baseVariation.yFrom))) {
                             int x = tilePosition[0];
@@ -979,7 +1042,7 @@ public class Game {
                             }
                         }
                     }
-                    case air -> { // TODO bugfix this
+                    case air -> {
                         for (int[] tilePosition: getTilePositionsInRange(baseVariation.xFrom, baseVariation.yFrom, 1)) {
                             Tile tile = board[tilePosition[0]][tilePosition[1]];
                             if (tile.getPiece() != null) continue;
@@ -1372,7 +1435,6 @@ public class Game {
     }
 
     public void printBoardPieces() {
-        System.out.println("BoardPieces of Player 0 (Blue) and Player 1 (Red):");
         for (int y = 0; y < 8; y++) {
             String out = "";
             for (int x = 0; x < 8; x++) {
