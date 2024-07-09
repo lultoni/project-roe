@@ -36,7 +36,7 @@ public class Node {
     public void expand() {
         Player p = gameState.getPlayer(player);
         for (Turn turn: gameState.generatePossibleTurns(p)) {
-            Game newGameState = new Game();
+            Game newGameState = new Game(gameState.getPlayer(false).getIsHuman(), gameState.getPlayer(true).getIsHuman());
             copyGameState(newGameState, gameState);
             p = newGameState.getPlayer(player);
             newGameState.executeTurn(turn, p, null);
@@ -45,7 +45,7 @@ public class Node {
     }
 
     public double simulate() {
-        Game simGameState = new Game();
+        Game simGameState = new Game(gameState.getPlayer(false).getIsHuman(), gameState.getPlayer(true).getIsHuman());
         copyGameState(simGameState, gameState);
         Random random = new Random();
         boolean currentPlayer = player;

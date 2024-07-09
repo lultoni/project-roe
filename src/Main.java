@@ -3,7 +3,7 @@ import java.util.ArrayList;
 public class Main {
     public static void main(String[] args) {
         System.out.println("Boot - [project-roe]\n");
-        Game game = new Game();
+        Game game = new Game(false, false);
         Window window = new Window(game);
 
 //        game.doDBT(window, "Player0 Turn:(ST: 5)\n" +
@@ -90,18 +90,12 @@ public class Main {
 //                "TurnSpell(0, 4, 2, [(7, 5)])\n" +
 //                "}");
 
-//        ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(false));
-//        System.out.println("\nPlayer0");
-//        for (Piece p: game.getPlayer(false).getPieces()) {
-//            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
-//        }
-//        System.out.println("\nPlayer1");
-//        for (Piece p: game.getPlayer(true).getPieces()) {
-//            System.out.println(p.getType() + "(" + p.getXPos() + ", " + p.getYPos() + ")");
-//        }
+        ArrayList<Turn> possibleTurnsP0 = game.generatePossibleTurns(game.getPlayer(false));
+        System.out.println("possibleTurnsP0: " + possibleTurnsP0.size());
+        System.out.println(game.generatePositionFEN());
+        game.printBoardPieces();
 
-        System.out.println("\n\n---Starting Game---");
-        game.startGame(window);
+//        game.startGame(window);
         System.out.println("\nClose - [project-roe]");
     }
 }
