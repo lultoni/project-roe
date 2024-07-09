@@ -23,27 +23,23 @@ public class Player {
             }
             return game.getHumanTurn();
         } else {
-            double bestScore = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-            ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(game.getTurnCounter() % 1 != 0));
+            int depth = 2; // Look 2 moves ahead
+            boolean isMaximizingPlayer = game.getTurnCounter() % 1 == 0;
+            double bestScore = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+            ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(isMaximizingPlayer));
             ArrayList<Turn> bestTurns = new ArrayList<>();
             Game gameState = game.copyGameState();
 
             System.out.println("---pos_turns len " + possibleTurns.size());
-            System.out.println("cur turn " + ((game.getTurnCounter() % 1 == 0) ? "0" : "1"));
+            System.out.println("cur turn " + (isMaximizingPlayer ? "0" : "1"));
 
             for (Turn turn : possibleTurns) {
-                game.executeTurn(turn, game.getPlayer(game.getTurnCounter() % 1 != 0), null);
+                game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
                 game.setTurnCounter(game.getTurnCounter() - 0.5);
-                double score = (game.getTurnCounter() % 1 == 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
 
-                try {
-                    score = game.evaluate();
-                } catch (Exception e) {
-                    System.out.println("I am the little bitch that thinks it's funny to throw errors:");
-                    turn.print();
-                }
+                double score = minimax(game, depth - 1, !isMaximizingPlayer);
 
-                if (game.getTurnCounter() % 1 == 0) {
+                if (isMaximizingPlayer) {
                     if (score > bestScore) {
                         bestScore = score;
                         bestTurns.clear();
@@ -52,7 +48,7 @@ public class Player {
                         bestTurns.add(turn);
                     }
                 } else {
-                    if (score < bestScore) { // TODO no way this ai ain't retarded bruh, like win the game!!!
+                    if (score < bestScore) {
                         bestScore = score;
                         bestTurns.clear();
                         bestTurns.add(turn);
@@ -64,10 +60,36 @@ public class Player {
             }
 
             System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");
-
             Random random = new Random();
             return bestTurns.get(random.nextInt(bestTurns.size()));
         }
+    }
+
+    private double minimax(Game game, int depth, boolean isMaximizingPlayer) {
+        if (depth == 0 || game.isGameOver() != 2) {
+            return game.evaluate();
+        }
+
+        ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(isMaximizingPlayer));
+        double bestScore = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+        Game gameState = game.copyGameState();
+
+        for (Turn turn : possibleTurns) {
+            game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
+            game.setTurnCounter(game.getTurnCounter() - 0.5);
+
+            double score = minimax(game, depth - 1, !isMaximizingPlayer);
+
+            if (isMaximizingPlayer) {
+                bestScore = Math.max(bestScore, score);
+            } else {
+                bestScore = Math.min(bestScore, score);
+            }
+
+            game.loadGameState(gameState);
+        }
+
+        return bestScore;
     }
 
     public boolean getIsHuman() {
