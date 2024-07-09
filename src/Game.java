@@ -218,9 +218,7 @@ public class Game {
         }
 
         // TODO try to add a mageOpponent distance or something
-        Random random = new Random();
-        float randomFloat = 0.95f + (random.nextFloat() * (1.05f - 0.95f));
-        return score * randomFloat;
+        return score;
     }
 
     private ArrayList<Tile> getTilesInRange(int xPos, int yPos, int range) {
@@ -535,33 +533,13 @@ public class Game {
         Set<String> positionsAfterTurn = new HashSet<>();
         if (isGameOver() != 2) return possibleTurns;
 
-        int tempSize = 0;
-        int breakPoint = 5_000_000;
-
         // x x x
-        long startTime = System.currentTimeMillis();
         int[][] position = fetchPositionPieces();
         possibleTurns.add(new Turn(null, null, null, null, null));
         positionsAfterTurn.add(generatePositionFEN());
-        tempSize = logAndResetState("x x x", tempSize, player, possibleTurns, position, startTime);
-
-        // x a x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
-        if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-            Piece piece = storePieceOfAttack(attack);
-            Object[] guardPosition = doAttack(attack);
-            String fen = generatePositionFEN();
-            undoAttack(attack, piece, guardPosition);
-            if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
-                possibleTurns.add(new Turn(null, null, null, attack, null));
-            }
-        }
-        tempSize = logAndResetState("x a x", tempSize, player, possibleTurns, position, startTime);
+        logAndResetState(player, position);
 
         // x x s
-        startTime = System.currentTimeMillis();
         position = fetchPositionPieces();
         ArrayList<ArrayList<TurnSpell>> possibleSpellCombinations = generatePossibleSpellCombinations(player);
         if (!possibleSpellCombinations.isEmpty()) {
@@ -572,19 +550,25 @@ public class Game {
                 }
                 String fen = generatePositionFEN();
                 loadGameState(copyState);
-                if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                if (positionsAfterTurn.add(fen)) {
                     possibleTurns.add(new Turn(null, null, null, null, spells));
                 }
             }
         }
-        tempSize = logAndResetState("x x s", tempSize, player, possibleTurns, position, startTime);
+        logAndResetState(player, position);
 
-        // x a s
-        startTime = System.currentTimeMillis();
+        // x a x
         position = fetchPositionPieces();
+        ArrayList<Attack> possibleAttacks = generatePossibleAttacks(player);
         if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
             Piece piece = storePieceOfAttack(attack);
             Object[] guardPosition = doAttack(attack);
+            String fen = generatePositionFEN();
+            if (positionsAfterTurn.add(fen)) {
+                possibleTurns.add(new Turn(null, null, null, attack, null));
+            }
+
+            // x a s
             possibleSpellCombinations = generatePossibleSpellCombinations(player);
             if (!possibleSpellCombinations.isEmpty()) {
                 Game copyState = copyGameState();
@@ -592,165 +576,88 @@ public class Game {
                     for (TurnSpell spell: spells) {
                         castSpell(spell, player);
                     }
-                    String fen = generatePositionFEN();
+                    fen = generatePositionFEN();
                     loadGameState(copyState);
-                    if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                    if (positionsAfterTurn.add(fen)) {
                         possibleTurns.add(new Turn(null, null, null, attack, spells));
                     }
                 }
             }
             undoAttack(attack, piece, guardPosition);
         }
-        tempSize = logAndResetState("x a s", tempSize, player, possibleTurns, position, startTime);
+        logAndResetState(player, position);
 
         // m x x
-        startTime = System.currentTimeMillis();
         position = fetchPositionPieces();
         ArrayList<Move> possibleMoves = generatePossibleMoves(player);
+        ArrayList<Move> possibleMovesAfterMove1;
+        ArrayList<Move> possibleMovesAfterMove2;
         if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
             Piece piece = board[move.xFrom][move.yFrom].getPiece();
             doMove(move, false);
             String fen = generatePositionFEN();
-            if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+            if (positionsAfterTurn.add(fen)) {
                 possibleTurns.add(new Turn(move, null, null, null, null));
             }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m x x", tempSize, player, possibleTurns, position, startTime);
 
-        // m a x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleAttacks = generatePossibleAttacks(player);
-            if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-                Piece pieceAtt = storePieceOfAttack(attack);
-                Object[] guardPosition = doAttack(attack);
-                String fen = generatePositionFEN();
-                undoAttack(attack, pieceAtt, guardPosition);
-                if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
-                    possibleTurns.add(new Turn(move, null, null, attack, null));
-                }
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m a x", tempSize, player, possibleTurns, position, startTime);
-
-        // m x s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
+            // m x s
             possibleSpellCombinations = generatePossibleSpellCombinations(player);
             if (!possibleSpellCombinations.isEmpty()) {
                 Game copyState = copyGameState();
-                for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-                    for (TurnSpell spell: spells) {
+                for (ArrayList<TurnSpell> spells : possibleSpellCombinations) {
+                    for (TurnSpell spell : spells) {
                         castSpell(spell, player);
                     }
-                    String fen = generatePositionFEN();
+                    fen = generatePositionFEN();
                     loadGameState(copyState);
-                    if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                    if (positionsAfterTurn.add(fen)) {
                         possibleTurns.add(new Turn(move, null, null, null, spells));
                     }
                 }
             }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m x s", tempSize, player, possibleTurns, position, startTime);
 
-        // m a s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
+            // m a x
             possibleAttacks = generatePossibleAttacks(player);
             if (!possibleAttacks.isEmpty()) for (Attack attack: possibleAttacks) {
-                Piece piece2 = storePieceOfAttack(attack);
+                Piece pieceAtt = storePieceOfAttack(attack);
                 Object[] guardPosition = doAttack(attack);
+                fen = generatePositionFEN();
+                if (positionsAfterTurn.add(fen)) {
+                    possibleTurns.add(new Turn(move, null, null, attack, null));
+                }
+
+                // m a s
                 possibleSpellCombinations = generatePossibleSpellCombinations(player);
                 if (!possibleSpellCombinations.isEmpty()) {
                     Game copyState = copyGameState();
-                    for (ArrayList<TurnSpell> spells: possibleSpellCombinations) {
-                        for (TurnSpell spell: spells) {
+                    for (ArrayList<TurnSpell> spells : possibleSpellCombinations) {
+                        for (TurnSpell spell : spells) {
                             castSpell(spell, player);
                         }
-                        String fen = generatePositionFEN();
+                        fen = generatePositionFEN();
                         loadGameState(copyState);
-                        if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                        if (positionsAfterTurn.add(fen)) {
                             possibleTurns.add(new Turn(move, null, null, attack, spells));
                         }
                     }
                 }
-                undoAttack(attack, piece2, guardPosition);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m a s", tempSize, player, possibleTurns, position, startTime);
 
-        // m m x x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<Move> possibleMovesAfterMove1;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
+                undoAttack(attack, pieceAtt, guardPosition);
+            }
+
+
+            // m m x x
             possibleMovesAfterMove1 = generatePossibleMoves(player);
             if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
                 Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
                 doMove(move2, false);
-                String fen = generatePositionFEN();
-                if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                fen = generatePositionFEN();
+                if (positionsAfterTurn.add(fen)) {
                     possibleTurns.add(new Turn(move, move2, null, null, null));
                 }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m x x", tempSize, player, possibleTurns, position, startTime);
 
-        // m m a x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<Attack> possibleAttacksAfterMove1;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
-                possibleAttacksAfterMove1 = generatePossibleAttacks(player);
-                if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
-                    Piece pieceAtt = storePieceOfAttack(attack);
-                    Object[] guardPosition = doAttack(attack);
-                    String fen = generatePositionFEN();
-                    undoAttack(attack, pieceAtt, guardPosition);
-                    if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
-                        possibleTurns.add(new Turn(move, move2, null, attack, null));
-                    }
-                }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m a x", tempSize, player, possibleTurns, position, startTime);
-
-        // m m x s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
+                // m m x s
+                ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove1;
                 possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                 if (!possibleSpellsAfterMove1.isEmpty()) {
                     Game copyState = copyGameState();
@@ -758,33 +665,26 @@ public class Game {
                         for (TurnSpell spell: spells) {
                             castSpell(spell, player);
                         }
-                        String fen = generatePositionFEN();
+                        fen = generatePositionFEN();
                         loadGameState(copyState);
-                        if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                        if (positionsAfterTurn.add(fen)) {
                             possibleTurns.add(new Turn(move, move2, null, null, spells));
                         }
                     }
                 }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m x s", tempSize, player, possibleTurns, position, startTime);
 
-        // m m a s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
+                // m m a x
+                ArrayList<Attack> possibleAttacksAfterMove1;
                 possibleAttacksAfterMove1 = generatePossibleAttacks(player);
                 if (!possibleAttacksAfterMove1.isEmpty()) for (Attack attack: possibleAttacksAfterMove1) {
-                    Piece piece3 = storePieceOfAttack(attack);
+                    Piece pieceAtt = storePieceOfAttack(attack);
                     Object[] guardPosition = doAttack(attack);
+                    fen = generatePositionFEN();
+                    if (positionsAfterTurn.add(fen)) {
+                        possibleTurns.add(new Turn(move, move2, null, attack, null));
+                    }
+
+                    // m m a s
                     possibleSpellsAfterMove1 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove1.isEmpty()) {
                         Game copyState = copyGameState();
@@ -792,96 +692,29 @@ public class Game {
                             for (TurnSpell spell: spells) {
                                 castSpell(spell, player);
                             }
-                            String fen = generatePositionFEN();
+                            fen = generatePositionFEN();
                             loadGameState(copyState);
-                            if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                            if (positionsAfterTurn.add(fen)) {
                                 possibleTurns.add(new Turn(move, move2, null, attack, spells));
                             }
                         }
                     }
-                    undoAttack(attack, piece3, guardPosition);
-                }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m a s", tempSize, player, possibleTurns, position, startTime);
 
-        // m m m x x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<Move> possibleMovesAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
+                    undoAttack(attack, pieceAtt, guardPosition);
+                }
+
+                // m m m x x
                 possibleMovesAfterMove2 = generatePossibleMoves(player);
                 if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
                     Piece piece3 = board[move3.xFrom][move3.yFrom].getPiece();
                     doMove(move3, false);
-                    String fen = generatePositionFEN();
-                    if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                    fen = generatePositionFEN();
+                    if (positionsAfterTurn.add(fen)) {
                         possibleTurns.add(new Turn(move, move2, move3, null, null));
                     }
-                    undoMove(move3, piece3);
-                }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m m x x", tempSize, player, possibleTurns, position, startTime);
 
-        // m m m a x
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<Attack> possibleAttacksAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    Piece piece3 = board[move3.xFrom][move3.yFrom].getPiece();
-                    doMove(move3, false);
-                    possibleAttacksAfterMove2 = generatePossibleAttacks(player);
-                    if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
-                        Piece pieceAtt = storePieceOfAttack(attack);
-                        Object[] guardPosition = doAttack(attack);
-                        String fen = generatePositionFEN();
-                        undoAttack(attack, pieceAtt, guardPosition);
-                        if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
-                            possibleTurns.add(new Turn(move, move2, move3, attack, null));
-                        }
-                    }
-                    undoMove(move3, piece3);
-                }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m m a x", tempSize, player, possibleTurns, position, startTime);
-
-        // m m m x s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove2;
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    Piece piece3 = board[move3.xFrom][move3.yFrom].getPiece();
-                    doMove(move3, false);
+                    // m m m x s
+                    ArrayList<ArrayList<TurnSpell>> possibleSpellsAfterMove2;
                     possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
                     if (!possibleSpellsAfterMove2.isEmpty()) {
                         Game copyState = copyGameState();
@@ -889,39 +722,26 @@ public class Game {
                             for (TurnSpell spell: spells) {
                                 castSpell(spell, player);
                             }
-                            String fen = generatePositionFEN();
+                            fen = generatePositionFEN();
                             loadGameState(copyState);
-                            if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                            if (positionsAfterTurn.add(fen)) {
                                 possibleTurns.add(new Turn(move, move2, move3, null, spells));
                             }
                         }
                     }
-                    undoMove(move3, piece3);
-                }
-                undoMove(move2, piece2);
-            }
-            undoMove(move, piece);
-        }
-        tempSize = logAndResetState("m m m x s", tempSize, player, possibleTurns, position, startTime);
 
-        // m m m a s
-        startTime = System.currentTimeMillis();
-        position = fetchPositionPieces();
-        if (!possibleMoves.isEmpty()) for (Move move: possibleMoves) {
-            Piece piece = board[move.xFrom][move.yFrom].getPiece();
-            doMove(move, false);
-            possibleMovesAfterMove1 = generatePossibleMoves(player);
-            if (!possibleMovesAfterMove1.isEmpty()) for (Move move2: possibleMovesAfterMove1) {
-                Piece piece2 = board[move2.xFrom][move2.yFrom].getPiece();
-                doMove(move2, false);
-                possibleMovesAfterMove2 = generatePossibleMoves(player);
-                if (!possibleMovesAfterMove2.isEmpty()) for (Move move3: possibleMovesAfterMove2) {
-                    Piece piece3 = board[move3.xFrom][move3.yFrom].getPiece();
-                    doMove(move3, false);
+                    // m m m a x
+                    ArrayList<Attack> possibleAttacksAfterMove2;
                     possibleAttacksAfterMove2 = generatePossibleAttacks(player);
                     if (!possibleAttacksAfterMove2.isEmpty()) for (Attack attack: possibleAttacksAfterMove2) {
                         Piece pieceAtt = storePieceOfAttack(attack);
                         Object[] guardPosition = doAttack(attack);
+                        fen = generatePositionFEN();
+                        if (positionsAfterTurn.add(fen)) {
+                            possibleTurns.add(new Turn(move, move2, move3, attack, null));
+                        }
+
+                        // m m m a s
                         possibleSpellsAfterMove2 = generatePossibleSpellCombinations(player);
                         if (!possibleSpellsAfterMove2.isEmpty()) {
                             Game copyState = copyGameState();
@@ -929,22 +749,24 @@ public class Game {
                                 for (TurnSpell spell: spells) {
                                     castSpell(spell, player);
                                 }
-                                String fen = generatePositionFEN();
+                                fen = generatePositionFEN();
                                 loadGameState(copyState);
-                                if (possibleTurns.size() - tempSize <= breakPoint && positionsAfterTurn.add(fen)) {
+                                if (positionsAfterTurn.add(fen)) {
                                     possibleTurns.add(new Turn(move, move2, move3, attack, spells));
                                 }
                             }
                         }
+
                         undoAttack(attack, pieceAtt, guardPosition);
                     }
+
                     undoMove(move3, piece3);
                 }
                 undoMove(move2, piece2);
             }
             undoMove(move, piece);
         }
-        logAndResetState("m m m a s", tempSize, player, possibleTurns, position, startTime);
+        logAndResetState(player, position);
 
         return possibleTurns;
     }
@@ -966,16 +788,9 @@ public class Game {
     }
 
 
-    private int logAndResetState(String text, int tempSize, Player player, ArrayList<Turn> possibleTurns, int[][] position, long startTime) {
+    private void logAndResetState(Player player, int[][] position) {
         setPiecesPosition(position);
         resetHasMoved(player);
-        int difference = possibleTurns.size() - tempSize;
-        long timeElapsed = System.currentTimeMillis() - startTime;
-
-        String formattedText = String.format("%-11s - %7d - %dms", "(" + text + ")", difference, timeElapsed);
-        System.out.println(formattedText);
-
-        return possibleTurns.size();
     }
 
     private void setPiecesPosition(int[][] position) {

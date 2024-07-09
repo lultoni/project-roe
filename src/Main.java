@@ -90,12 +90,14 @@ public class Main {
 //                "TurnSpell(0, 4, 2, [(7, 5)])\n" +
 //                "}");
 
-        ArrayList<Turn> possibleTurnsP0 = game.generatePossibleTurns(game.getPlayer(false));
-        System.out.println("possibleTurnsP0: " + possibleTurnsP0.size());
-        System.out.println(game.generatePositionFEN());
-        game.printBoardPieces();
+//        long startTime = System.currentTimeMillis();
+//        ArrayList<Turn> possibleTurnsP0 = game.generatePossibleTurns(game.getPlayer(false));
+//        System.out.println("possibleTurnsP0: " + possibleTurnsP0.size());
+//        System.out.println("time: " + (System.currentTimeMillis() - startTime) + " ms");
+//        System.out.println(game.generatePositionFEN());
+//        game.printBoardPieces();
 
-//        game.startGame(window);
+        game.startGame(window);
         System.out.println("\nClose - [project-roe]");
     }
 }
