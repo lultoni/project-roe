@@ -1,10 +1,13 @@
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 public class Player {
     private int spellTokens;
     private final Piece[] pieces;
     private final boolean isHuman;
+    private final Map<String, Double> transpositionTable = new HashMap<>();
 
     public Player(Piece[] pieces, boolean isHuman) {
         spellTokens = 5;
@@ -23,21 +26,23 @@ public class Player {
             }
             return game.getHumanTurn();
         } else {
-            int depth = 2; // Look 2 moves ahead
+            int depth = 2;
             boolean isMaximizingPlayer = game.getTurnCounter() % 1 == 0;
             double bestScore = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
             ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(isMaximizingPlayer));
             ArrayList<Turn> bestTurns = new ArrayList<>();
             Game gameState = game.copyGameState();
+            long startTime = System.currentTimeMillis();
 
             System.out.println("---pos_turns len " + possibleTurns.size());
             System.out.println("cur turn " + (isMaximizingPlayer ? "0" : "1"));
 
-            for (Turn turn : possibleTurns) {
+            for (int i = 0; i < possibleTurns.size(); i++) {
+                Turn turn = possibleTurns.get(i);
                 game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
                 game.setTurnCounter(game.getTurnCounter() - 0.5);
 
-                double score = minimax(game, depth - 1, !isMaximizingPlayer);
+                double score = minimax(game, depth - 1, !isMaximizingPlayer, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
 
                 if (isMaximizingPlayer) {
                     if (score > bestScore) {
@@ -57,17 +62,26 @@ public class Player {
                     }
                 }
                 game.loadGameState(gameState);
+                System.out.println("(" + String.format("%.2f", ((float) i / possibleTurns.size()) * 100) + "%) - " + bestScore);
             }
 
             System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");
+            System.out.println("time for d" + depth + ": " + (System.currentTimeMillis() - startTime) + " ms");
             Random random = new Random();
             return bestTurns.get(random.nextInt(bestTurns.size()));
         }
     }
 
-    private double minimax(Game game, int depth, boolean isMaximizingPlayer) {
+    private double minimax(Game game, int depth, boolean isMaximizingPlayer, double alpha, double beta) {
+        String fen = game.generatePositionFEN();
+        if (transpositionTable.containsKey(fen)) {
+            return transpositionTable.get(fen);
+        }
+
         if (depth == 0 || game.isGameOver() != 2) {
-            return game.evaluate();
+            double evaluation = game.evaluate();
+            transpositionTable.put(fen, evaluation);
+            return evaluation;
         }
 
         ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(isMaximizingPlayer));
@@ -78,17 +92,24 @@ public class Player {
             game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
             game.setTurnCounter(game.getTurnCounter() - 0.5);
 
-            double score = minimax(game, depth - 1, !isMaximizingPlayer);
+            double score = minimax(game, depth - 1, !isMaximizingPlayer, alpha, beta);
 
             if (isMaximizingPlayer) {
                 bestScore = Math.max(bestScore, score);
+                alpha = Math.max(alpha, score);
             } else {
                 bestScore = Math.min(bestScore, score);
+                beta = Math.min(beta, score);
             }
 
             game.loadGameState(gameState);
+
+            if (beta <= alpha) {
+                break;
+            }
         }
 
+        transpositionTable.put(fen, bestScore);
         return bestScore;
     }
 
