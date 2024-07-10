@@ -160,7 +160,7 @@ public class SpellData {
         board[x][y].getPiece().setAttackProtectedTimer(1);
     }
 
-    private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) { // TODO blocked/death
+    private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) {
         int[] sequence = new int[8];
         if (direction == 1) {
             // Direction 1: (8)(7)(6)
@@ -184,7 +184,7 @@ public class SpellData {
         }
     }
 
-    private void pushBackPiece(Tile[][] board, int x, int y, int direction) { // TODO blocked/death
+    private void pushBackPiece(Tile[][] board, int x, int y, int direction) {
         Piece piece = board[x][y].getPiece();
         int newPosY = y + direction;
 
@@ -196,7 +196,14 @@ public class SpellData {
 
         // Check if all positions in the path are empty
         for (int i = y + (int) Math.signum(direction); i != newPosY; i += (int) Math.signum(direction)) {
-            if (!isValidPosition(x, i) || board[x][i].getPiece() != null) return;
+            if (!isValidPosition(x, i)) return;
+            if (board[x][i].getPiece() != null || board[x][i].getBlockedTimer() > 0) {
+                newPosY = i - (int) Math.signum(direction);
+                break;
+            } else if (board[x][i].getDeathTimer() > 0) {
+                removePiece(board, x, y);
+                return;
+            }
         }
 
         // Check if the final position is valid and empty

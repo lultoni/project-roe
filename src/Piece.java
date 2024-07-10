@@ -80,4 +80,13 @@ public class Piece {
     public void setOvergrownTimer(double overgrownTimer) {
         this.overgrownTimer = overgrownTimer;
     }
+
+    public void copyPropertiesFrom(Piece other) {
+        this.setPosition(other.getXPos(), other.getYPos());
+        this.setHasMoved(other.hasMoved());
+        this.setAttackProtectedTimer(other.getAttackProtectedTimer());
+        this.setSpellProtectedTimer(other.getSpellProtectedTimer());
+        this.setSpellReflectionTimer(other.getSpellReflectionTimer());
+        this.setOvergrownTimer(other.getOvergrownTimer());
+    }
 }

@@ -286,7 +286,7 @@ public class Game {
     }
 
     public void executeTurn(Turn turn, Player player, Window window) {
-        int ms = 2000;
+        int ms = 1500;
         if (window != null && turn.move1 != null) {
             window.updateWindow();
             waiter(ms);
@@ -415,15 +415,44 @@ public class Game {
                 if (printDebug) System.out.println("utility - " + dataOfSpell.mageType);
                 switch (dataOfSpell.mageType) {
                     case fire -> {
-                        if (printDebug) System.out.println("Fire utility spell targets: " + spell.getTargetsString());
-                        return spell.targets.size() == 3 &&
-                                board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null &&
-                                board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() == null &&
-                                board[spell.targets.get(2)[0]][spell.targets.get(2)[1]].getPiece() == null &&
-                                (((spell.targets.getFirst()[0] == spell.targets.get(1)[0]) && (spell.targets.getFirst()[0] == spell.targets.get(2)[0])) &&
-                                        (spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 2)) &&
-                                (((spell.targets.getFirst()[1] == spell.targets.get(1)[1]) && (spell.targets.getFirst()[0] == spell.targets.get(2)[1])) &&
-                                        (spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1) && (spell.targets.getFirst()[1] == spell.targets.get(1)[0] - 2));
+                        boolean hasThreeTargets = spell.targets.size() == 3;
+                        boolean isFirstTargetEmpty = board[spell.targets.getFirst()[0]][spell.targets.getFirst()[1]].getPiece() == null;
+                        boolean isSecondTargetEmpty = board[spell.targets.get(1)[0]][spell.targets.get(1)[1]].getPiece() == null;
+                        boolean isThirdTargetEmpty = board[spell.targets.get(2)[0]][spell.targets.get(2)[1]].getPiece() == null;
+
+                        boolean isFirstHorizontal = (spell.targets.getFirst()[1] == spell.targets.get(1)[1]) && (spell.targets.getFirst()[1] == spell.targets.get(2)[1]);
+                        boolean isFirstVertical = (spell.targets.getFirst()[0] == spell.targets.get(1)[0]) && (spell.targets.getFirst()[0] == spell.targets.get(2)[0]);
+
+                        boolean isFirstInLineWithSecondHor = spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1 && spell.targets.getFirst()[0] == spell.targets.get(2)[0] - 2;
+                        boolean isFirstInLineWithThirdHor = spell.targets.getFirst()[0] == spell.targets.get(1)[0] - 1 && spell.targets.getFirst()[0] == spell.targets.get(2)[0] - 2;
+
+                        boolean isFirstInLineWithSecondVer = spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 1 && spell.targets.getFirst()[1] == spell.targets.get(2)[1] - 2;
+                        boolean isFirstInLineWithThirdVer = spell.targets.getFirst()[1] == spell.targets.get(1)[1] - 1 && spell.targets.getFirst()[1] == spell.targets.get(2)[1] - 2;
+
+                        boolean isValid = hasThreeTargets &&
+                                isFirstTargetEmpty &&
+                                isSecondTargetEmpty &&
+                                isThirdTargetEmpty &&
+                                ((isFirstHorizontal && isFirstInLineWithSecondHor && isFirstInLineWithThirdHor) ||
+                                        (isFirstVertical && isFirstInLineWithSecondVer && isFirstInLineWithThirdVer));
+
+                        if (printDebug) {
+                            System.out.println("Fire utility spell targets: " + spell.getTargetsString());
+                            System.out.println("Condition checks:");
+                            System.out.println("- hasThreeTargets: " + hasThreeTargets);
+                            System.out.println("- isFirstTargetEmpty: " + isFirstTargetEmpty);
+                            System.out.println("- isSecondTargetEmpty: " + isSecondTargetEmpty);
+                            System.out.println("- isThirdTargetEmpty: " + isThirdTargetEmpty);
+                            System.out.println("- isFirstHorizontal: " + isFirstHorizontal);
+                            System.out.println("- isFirstVertical: " + isFirstVertical);
+                            System.out.println("- isFirstInLineWithSecondHor: " + isFirstInLineWithSecondHor);
+                            System.out.println("- isFirstInLineWithThirdHor: " + isFirstInLineWithThirdHor);
+                            System.out.println("- isFirstInLineWithSecondVer: " + isFirstInLineWithSecondVer);
+                            System.out.println("- isFirstInLineWithThirdVer: " + isFirstInLineWithThirdVer);
+                            System.out.println("isValid: " + isValid);
+                        }
+
+                        return isValid;
                     }
                     case water -> {
                         if (printDebug) System.out.println("Water utility spell is always legal.");
@@ -1455,6 +1484,7 @@ public class Game {
             }
             System.out.println(out);
         }
+        System.out.println(generatePositionFEN());
     }
 
     public Player getPlayer(boolean player) {
@@ -1540,29 +1570,17 @@ public class Game {
     public void loadGameState(Game gameState) {
         // Load player 0 pieces
         Piece[] player0Pieces = gameState.player0.getPieces();
+        Piece[] originalPlayer0Pieces = player0.getPieces();
         for (int i = 0; i < player0Pieces.length; i++) {
-            Piece loadedPiece = player0Pieces[i];
-            Piece originalPiece = player0.getPieces()[i];
-            originalPiece.setPosition(loadedPiece.getXPos(), loadedPiece.getYPos());
-            originalPiece.setHasMoved(loadedPiece.hasMoved());
-            originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
-            originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
-            originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
-            originalPiece.setOvergrownTimer(loadedPiece.getOvergrownTimer());
+            originalPlayer0Pieces[i].copyPropertiesFrom(player0Pieces[i]);
         }
         player0.setSpellTokens(gameState.player0.getSpellTokens());
 
         // Load player 1 pieces
         Piece[] player1Pieces = gameState.player1.getPieces();
+        Piece[] originalPlayer1Pieces = player1.getPieces();
         for (int i = 0; i < player1Pieces.length; i++) {
-            Piece loadedPiece = player1Pieces[i];
-            Piece originalPiece = player1.getPieces()[i];
-            originalPiece.setPosition(loadedPiece.getXPos(), loadedPiece.getYPos());
-            originalPiece.setHasMoved(loadedPiece.hasMoved());
-            originalPiece.setAttackProtectedTimer(loadedPiece.getAttackProtectedTimer());
-            originalPiece.setSpellProtectedTimer(loadedPiece.getSpellProtectedTimer());
-            originalPiece.setSpellReflectionTimer(loadedPiece.getSpellReflectionTimer());
-            originalPiece.setOvergrownTimer(loadedPiece.getOvergrownTimer());
+            originalPlayer1Pieces[i].copyPropertiesFrom(player1Pieces[i]);
         }
         player1.setSpellTokens(gameState.player1.getSpellTokens());
 
@@ -1590,7 +1608,7 @@ public class Game {
             }
         }
 
-        // Load current turn counter
+        // Load current turn counter and other variables
         this.turnCounter = gameState.turnCounter;
         this.humanTurn = gameState.humanTurn;
         this.lastTurn = gameState.lastTurn;

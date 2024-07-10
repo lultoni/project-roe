@@ -7,12 +7,13 @@ public class Player {
     private int spellTokens;
     private final Piece[] pieces;
     private final boolean isHuman;
-    private final Map<String, Double> transpositionTable = new HashMap<>();
+    private final Map<String, Double> transpositionTable;
 
     public Player(Piece[] pieces, boolean isHuman) {
         spellTokens = 5;
         this.pieces = pieces;
         this.isHuman = isHuman;
+        transpositionTable = new HashMap<>();
     }
 
     public Piece[] getPieces() {
@@ -37,12 +38,23 @@ public class Player {
             System.out.println("---pos_turns len " + possibleTurns.size());
             System.out.println("cur turn " + (isMaximizingPlayer ? "0" : "1"));
 
+            double alpha = Double.NEGATIVE_INFINITY;
+            double beta = Double.POSITIVE_INFINITY;
+
             for (int i = 0; i < possibleTurns.size(); i++) {
                 Turn turn = possibleTurns.get(i);
-                game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
-                game.setTurnCounter(game.getTurnCounter() - 0.5);
-
-                double score = minimax(game, depth - 1, !isMaximizingPlayer, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
+                double score = bestScore;
+                if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i > 620) {
+                    game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
+                    game.setTurnCounter(game.getTurnCounter() - 0.5);
+                    score = minimax(game, depth - 1, !isMaximizingPlayer, alpha, beta);
+                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i <= 284) {
+                    score = -222.51;
+                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i >= 285 && i <= 400) {
+                    score = -107.0;
+                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i >= 400 && i <= 620) {
+                    score = -110.5;
+                }
 
                 if (isMaximizingPlayer) {
                     if (score > bestScore) {
@@ -52,6 +64,7 @@ public class Player {
                     } else if (score == bestScore) {
                         bestTurns.add(turn);
                     }
+                    alpha = Math.max(alpha, bestScore);
                 } else {
                     if (score < bestScore) {
                         bestScore = score;
@@ -60,9 +73,19 @@ public class Player {
                     } else if (score == bestScore) {
                         bestTurns.add(turn);
                     }
+                    beta = Math.min(beta, bestScore);
                 }
+
                 game.loadGameState(gameState);
-                System.out.println("(" + String.format("%.2f", ((float) i / possibleTurns.size()) * 100) + "%) - " + bestScore);
+                System.out.println("(" + String.format("%.3f", ((float) i / possibleTurns.size()) * 100) + "%) - " +
+                        (bestScore > 0 ? "\033[32m" : bestScore < 0 ? "\033[31m" : "\033[0m") + Math.abs(bestScore) + "\033[0m" + " - " +
+                        (score > 0 ? "\033[32m" : score < 0 ? "\033[31m" : "\033[0m") + Math.abs(score) + "\033[0m" + " - index: " + i +
+                        " - (" + getCoolString(turn) + ")");
+
+                if (beta <= alpha) {
+                    System.out.println("Alpha-Beta Pruning stopped the continuation");
+                    break;
+                }
             }
 
             System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");
@@ -70,6 +93,25 @@ public class Player {
             Random random = new Random();
             return bestTurns.get(random.nextInt(bestTurns.size()));
         }
+    }
+
+    private String getCoolString(Turn turn) {
+        String out = "";
+        if (turn.move1 != null) out += "m";
+        if (turn.move2 != null) out += "m";
+        if (turn.move3 != null) out += "m";
+        if (turn.move1 != null && turn.move2 != null &&turn.move3 != null) out += "x";
+        if (turn.attack != null) {
+            out += "a";
+        } else {
+            out += "x";
+        }
+        if (turn.spells != null) {
+            out += "s";
+        } else {
+            out += "x";
+        }
+        return out;
     }
 
     private double minimax(Game game, int depth, boolean isMaximizingPlayer, double alpha, double beta) {
