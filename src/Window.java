@@ -21,7 +21,7 @@ public class Window extends JFrame {
         this.game = game;
         setTitle("project-roe");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setBounds(10, 10, 1500, 900);
+        setBounds(10, 10, 1000, 600);
         init();
         setVisible(true);
     }
