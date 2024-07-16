@@ -26,20 +26,24 @@ public class Player {
             }
             return game.getHumanTurn();
         } else {
+            long startTime = System.currentTimeMillis();
+            System.out.println("---start gen");
             int depth = 1;
             boolean isMaximizingPlayer = !pieces[0].getPlayer();
             double bestScore = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
             ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(!isMaximizingPlayer));
             ArrayList<Turn> bestTurns = new ArrayList<>();
             Game gameState = game.copyGameState();
-            long startTime = System.currentTimeMillis();
 
             System.out.println("---pos_turns len " + numberSplit(possibleTurns.size()));
+            System.out.println("---time gen: " + timerString(System.currentTimeMillis() - startTime));
             System.out.println("cur turn " + (isMaximizingPlayer ? "0" : "1"));
+            startTime = System.currentTimeMillis();
 
             double currentEval = game.evaluate();
             double alpha = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : currentEval;
             double beta = isMaximizingPlayer ? currentEval : Double.POSITIVE_INFINITY;
+            System.out.println("alpha (" + alpha + ") - beta (" + beta + ")");
 
             ArrayList<Double> initialScores = new ArrayList<>();
             for (Turn turn : possibleTurns) {
@@ -91,10 +95,10 @@ public class Player {
                         (score > 0 ? "\033[32m" : score < 0 ? "\033[31m" : "\033[0m") + Math.abs(score) + "\033[0m" + " - index: " + i +
                         " - (" + getCoolString(turn) + ") - " + timerString(System.currentTimeMillis() - startTime2));
 
-                if (beta <= alpha) {
-                    System.out.println("Alpha-Beta Pruning stopped the continuation");
-                    break;
-                }
+//                if (beta <= alpha) {
+//                    System.out.println("Alpha-Beta Pruning stopped the continuation");
+//                    break;
+//                }
             }
 
             System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");

@@ -21,7 +21,7 @@ public class Window extends JFrame {
         this.game = game;
         setTitle("project-roe");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setBounds(10, 10, 1000, 600);
+        setBounds(10, 10, 1100, 600);
         init();
         setVisible(true);
     }
@@ -39,7 +39,7 @@ public class Window extends JFrame {
             }
         }
 
-        JPanel turnPanel = new JPanel(new GridLayout(1, 5));
+        JPanel turnPanel = new JPanel(new GridLayout(0, 1));
 
         JPanel m1P = new JPanel(new GridLayout(0, 1));
         m1P.add(new JLabel("Move 1:"));

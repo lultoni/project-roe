@@ -1,3 +1,6 @@
+import java.util.ArrayList;
+import java.util.Comparator;
+
 public class SpellData {
     int cost;
     String name;
@@ -44,7 +47,7 @@ public class SpellData {
                             removePiece(board, spell.xFrom, spell.yFrom);
                         }
                     }
-                    case air -> { // TODO test
+                    case air -> {
                         boolean isSpellReflecting = board[x][y].getPiece().getSpellReflectionTimer() > 0;
                         removePiece(board, x, y);
                         pushBackAirOffense(board, x, y, (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 1 : -1);
@@ -82,14 +85,15 @@ public class SpellData {
             }
             case utility -> {
                 switch (mageType) {
-                    case fire -> { // TODO test
+                    case fire -> {
                         for (int[] t: spell.targets) {
                             setInfernoEffect(board, t[0], t[1], 1.75);
                         }
                     }
-                    case water -> { // TODO test
+                    case water -> {
                         int direction = (board[spell.xFrom][spell.yFrom].getPiece().getPlayer()) ? 2 : -2;
                         boolean isSpellReflecting = false;
+                        sortByYValue(spell.targets, direction != 2);
                         for (int[] t: spell.targets) {
                             if (board[t[0]][t[1]].getPiece().getSpellReflectionTimer() > 0) {
                                 isSpellReflecting = true;
@@ -98,7 +102,7 @@ public class SpellData {
                         }
                         if (isSpellReflecting && board[spell.xFrom][spell.yFrom].getPiece().getSpellProtectedTimer() == 0) pushBackPiece(board, spell.xFrom, spell.yFrom, -direction);
                     }
-                    case earth -> { // TODO test
+                    case earth -> {
                         boolean isSpellReflecting = false;
                         for (int[] t: spell.targets) {
                             if (board[t[0]][t[1]].getPiece() == null) continue;
@@ -134,6 +138,18 @@ public class SpellData {
                 }
             }
         }
+    }
+
+    private void sortByYValue(ArrayList<int[]> list, boolean ascending) {
+        Comparator<int[]> comparator = (arr1, arr2) -> {
+            if (ascending) {
+                return Integer.compare(arr1[1], arr2[1]);
+            } else {
+                return Integer.compare(arr2[1], arr1[1]);
+            }
+        };
+
+        list.sort(comparator);
     }
 
     private void setPiece(Tile[][] board, int x, int y, Piece piece) {
@@ -183,9 +199,10 @@ public class SpellData {
         int newPosY = y + direction;
 
         // Check if newPosY is valid, if not, reduce it nearer to 0 by 1
-        while (!isValidPosition(x, newPosY)) {
+        while (!isValidPosition(x, newPosY) || (isValidPosition(x, newPosY) && board[x][newPosY].getPiece() != null)) {
             direction -= (int) Math.signum(direction);
             newPosY = y + direction;
+            if (newPosY == y) return;
         }
 
         // Check if all positions in the path are empty
