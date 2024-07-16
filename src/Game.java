@@ -1,3 +1,5 @@
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -167,7 +169,7 @@ public class Game {
         }
         score += evaluateHelper(player0);
         score -= evaluateHelper(player1);
-        return score;
+        return round(score, 5);
     }
 
     private double evaluateHelper(Player p) {
@@ -176,16 +178,17 @@ public class Game {
         double mageScoreBoost = 1.3;
         double protectedScoreBoost = 0.35;
         double enemyAdjacentReduction = 8.5;
-        double guardProtectionBonus = 20;
+        double guardProtectionBonus = 23.5;
         double goodTerrain = 100;
         double okayTerrain = goodTerrain * 0.5;
         double badTerrain = okayTerrain * 0.5;
 
-        score += p.getSpellTokens() * spellTokenValue * Math.max(-0.5 * Math.round(turnCounter - 0.5) + 3, 1);
+        score += p.getSpellTokens() * spellTokenValue * Math.max(-0.4 * Math.round(turnCounter - 0.5) + 3, 1);
         boolean isGuardProtected = false;
 
         for (Piece piece: p.getPieces()) {
             if (piece.getXPos() != -1 && piece.getOvergrownTimer() == 0) {
+                // base variables & terrain scores
                 boolean isMage = piece.getType() != PieceType.guard;
                 int pta = pieceTerrainAdvantage(piece.getXPos(), piece.getYPos());
                 switch (pta) {
@@ -193,32 +196,85 @@ public class Game {
                     case 0 -> score += okayTerrain * ((isMage) ? mageScoreBoost : 1);
                     case -1 -> score += badTerrain * ((isMage) ? mageScoreBoost : 1);
                 }
+
+                // mobility bonus for the piece
                 score += getTilesInRange(piece.getXPos(), piece.getYPos(), getMovementRange(piece.getXPos(), piece.getYPos())).size();
+
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 1)) {
+                    // guard protection
                     if (tile.getPiece() != null && tile.getPiece().getType() == PieceType.guard && tile.getPiece().getPlayer() == piece.getPlayer() && isMage) {
                         isGuardProtected = true;
-                        if (piece.getType() == PieceType.spirit) score += guardProtectionBonus * 0.2;
+                        if (piece.getType() == PieceType.spirit) score += guardProtectionBonus * 0.1;
                     }
+                    // enemy adjacency reduction
                     if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / (piece.getAttackProtectedTimer() > 0 ? 2 : 1);
+                    // good terrain adjacency
                     if (isMage && pta != 1) if (terrainAdvantage(piece, tile) == 1) {
-                        score += goodTerrain * 0.05;
+                        score += goodTerrain * 0.07;
                     }
                 }
+
                 for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    // further enemy adjacency reduction
                     if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer()) score -= enemyAdjacentReduction / (piece.getAttackProtectedTimer() > 0 ? 4 : 2);
+                    // further good terrain adjacency
                     if (isMage && pta == 1) if (terrainAdvantage(piece, tile) == 1) {
-                        score += goodTerrain * 0.05;
+                        score += goodTerrain * 0.035;
                     }
-                }
-                for (Tile tile: getTilesInRange(piece.getXPos(), piece.getYPos(), 2)) {
+                    // enemy mage adjacency reduction
                     if (tile.getPiece() != null && tile.getPiece().getPlayer() != piece.getPlayer() && tile.getPiece().getType() != PieceType.guard) score -= guardProtectionBonus  * ((piece.getSpellProtectedTimer() > 0 || piece.getSpellReflectionTimer() > 0) ? protectedScoreBoost : 2);
+                }
+
+                // spell paths blocked
+                int spellPathAmount = 0;
+                int spellPathBlockedAmountAhead = 0;
+                int spellPathBlockedAmountBehind = 0;
+                if (isMage) for (int[] tilePosition: getTilePositionsInRange(piece.getXPos(), piece.getYPos(), 3)) {
+                    TurnSpell spell = new TurnSpell(0, tilePosition[0], tilePosition[1], new ArrayList<>(Collections.singleton(new int[]{piece.getXPos(), piece.getYPos()})));
+                    boolean haveToRemoveAgain = false;
+                    if (board[tilePosition[0]][tilePosition[1]].getPiece() == null) {
+                        haveToRemoveAgain = true;
+                        setPiece(tilePosition[0], tilePosition[1], new Piece(PieceType.fire, !piece.getPlayer()));
+                    }
+                    spellPathAmount++;
+                    if (!isSpellPathFree(spell)) {
+                        if (Math.signum(tilePosition[1] - piece.getYPos()) == 1 && piece.getPlayer()) {
+                            spellPathBlockedAmountAhead++;
+                        } else if (Math.signum(tilePosition[1] - piece.getYPos()) == 0) {
+                            spellPathBlockedAmountAhead++;
+                        } else if (Math.signum(tilePosition[1] - piece.getYPos()) == -1 && piece.getPlayer()) {
+                            spellPathBlockedAmountBehind++;
+                        } else if (Math.signum(tilePosition[1] - piece.getYPos()) == -1 && !piece.getPlayer()) {
+                            spellPathBlockedAmountAhead++;
+                        } else if (Math.signum(tilePosition[1] - piece.getYPos()) == 1 && !piece.getPlayer()) {
+                            spellPathBlockedAmountBehind++;
+                        }
+                    }
+                    if (haveToRemoveAgain) setPiece(tilePosition[0], tilePosition[1], null);
+                }
+                if (spellPathAmount > 0) {
+                    double terrainValue = 0;
+                    switch (pta) {
+                        case 1 -> terrainValue = goodTerrain;
+                        case 0 -> terrainValue = okayTerrain;
+                        case -1 -> terrainValue = badTerrain;
+                    }
+                    score += terrainValue * ((double) spellPathBlockedAmountAhead / (spellPathAmount - spellPathBlockedAmountBehind)) * 0.07;
+                    score += terrainValue * ((double) spellPathBlockedAmountBehind / (spellPathAmount - spellPathBlockedAmountAhead)) * 0.03;
                 }
             }
             score += guardProtectionBonus * (isGuardProtected ? 1 : -0.5);
         }
 
-        // TODO try to add a mageOpponent distance or something
         return score;
+    }
+
+    public double round(double score, int decimalPlaces) {
+        BigDecimal bd = new BigDecimal(score).setScale(decimalPlaces, RoundingMode.HALF_UP);
+        double roundedScore = bd.doubleValue();
+        String formatString = "%." + decimalPlaces + "f";
+        String formattedScore = String.format(Locale.US, formatString, roundedScore);
+        return Double.parseDouble(formattedScore);
     }
 
     private ArrayList<Tile> getTilesInRange(int xPos, int yPos, int range) {
@@ -319,6 +375,9 @@ public class Game {
         updateTimers();
         turnCounter += 0.5;
         lastTurn = turn;
+        if (window != null) {
+            window.updateWindow();
+        }
     }
 
     private void castSpell(TurnSpell spell, Player player) {
@@ -564,7 +623,7 @@ public class Game {
 
         // x x x
         int[][] position = fetchPositionPieces();
-        possibleTurns.add(new Turn(null, null, null, null, null));
+//        possibleTurns.add(new Turn(null, null, null, null, null));
         positionsAfterTurn.add(generatePositionFEN());
         logAndResetState(player, position);
 

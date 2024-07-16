@@ -21,7 +21,7 @@ public class Window extends JFrame {
         this.game = game;
         setTitle("project-roe");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setBounds(10, 10, 1000, 600);
+        setBounds(10, 10, 1500, 900);
         init();
         setVisible(true);
     }
@@ -206,6 +206,7 @@ public class Window extends JFrame {
             case spirit -> location = (!piece.getPlayer()) ? "BlueSpiritMage.png" : "RedSpiritMage.png";
         }
         if (piece.hasMoved() || piece.getOvergrownTimer() > 0) location = "Moved" + location;
+        if (piece.getOvergrownTimer() > 0) return combineImages(new ImageIcon(location).getImage(), new ImageIcon("OvergrownEffect.png").getImage(), 488, 488);
         return new ImageIcon(location).getImage();
     }
 
@@ -262,6 +263,9 @@ public class Window extends JFrame {
             if (piece.getAttackProtectedTimer() > 0) {
                 timerString = (String.valueOf(piece.getAttackProtectedTimer()));
                 protectionLocation = "AttackBubble.png";
+            }
+            if (piece.getOvergrownTimer() > 0) {
+                timerString = (String.valueOf(piece.getOvergrownTimer()));
             }
         }
         Image protectionImage = (protectionLocation.isEmpty()) ? null : loadImage(protectionLocation);

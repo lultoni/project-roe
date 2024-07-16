@@ -1,7 +1,6 @@
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.*;
 
 public class Player {
     private int spellTokens;
@@ -27,34 +26,44 @@ public class Player {
             }
             return game.getHumanTurn();
         } else {
-            int depth = 2;
-            boolean isMaximizingPlayer = game.getTurnCounter() % 1 == 0;
+            int depth = 1;
+            boolean isMaximizingPlayer = !pieces[0].getPlayer();
             double bestScore = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-            ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(isMaximizingPlayer));
+            ArrayList<Turn> possibleTurns = game.generatePossibleTurns(game.getPlayer(!isMaximizingPlayer));
             ArrayList<Turn> bestTurns = new ArrayList<>();
             Game gameState = game.copyGameState();
             long startTime = System.currentTimeMillis();
 
-            System.out.println("---pos_turns len " + possibleTurns.size());
+            System.out.println("---pos_turns len " + numberSplit(possibleTurns.size()));
             System.out.println("cur turn " + (isMaximizingPlayer ? "0" : "1"));
 
-            double alpha = Double.NEGATIVE_INFINITY;
-            double beta = Double.POSITIVE_INFINITY;
+            double currentEval = game.evaluate();
+            double alpha = isMaximizingPlayer ? Double.NEGATIVE_INFINITY : currentEval;
+            double beta = isMaximizingPlayer ? currentEval : Double.POSITIVE_INFINITY;
+
+            ArrayList<Double> initialScores = new ArrayList<>();
+            for (Turn turn : possibleTurns) {
+                game.executeTurn(turn, game.getPlayer(!isMaximizingPlayer), null);
+                game.setTurnCounter(game.getTurnCounter() - 0.5);
+                initialScores.add(game.evaluate());
+                game.loadGameState(gameState);
+            }
+            System.out.println("done with evaluating");
+
+            if (depth > 1) {
+                iterativeQuickSort(possibleTurns, initialScores, isMaximizingPlayer);
+                System.out.println("done with sorting");
+            }
 
             for (int i = 0; i < possibleTurns.size(); i++) {
+                long startTime2 = System.currentTimeMillis();
                 Turn turn = possibleTurns.get(i);
-                double score = bestScore;
-                if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i > 620) {
-                    game.executeTurn(turn, game.getPlayer(isMaximizingPlayer), null);
+                if (depth > 1) {
+                    game.executeTurn(turn, game.getPlayer(!isMaximizingPlayer), null);
                     game.setTurnCounter(game.getTurnCounter() - 0.5);
-                    score = minimax(game, depth - 1, !isMaximizingPlayer, alpha, beta);
-                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i <= 284) {
-                    score = -222.51;
-                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i >= 285 && i <= 400) {
-                    score = -107.0;
-                } else if (gameState.generatePositionFEN().equals("2rArErSrWrF1/2rGrGrGrGrG1/8/8/8/8/1bGbGbGbGbG2/1bFbWbSbEbA2 1.0 5 5") && i >= 400 && i <= 620) {
-                    score = -110.5;
                 }
+
+                double score = (depth > 1) ? minimax(game, depth - 1, !isMaximizingPlayer, alpha, beta) : initialScores.get(i);
 
                 if (isMaximizingPlayer) {
                     if (score > bestScore) {
@@ -77,10 +86,10 @@ public class Player {
                 }
 
                 game.loadGameState(gameState);
-                System.out.println("(" + String.format("%.3f", ((float) i / possibleTurns.size()) * 100) + "%) - " +
+                if (depth > 1) System.out.println("(" + String.format("%.3f", ((float) i / possibleTurns.size()) * 100) + "%) - " +
                         (bestScore > 0 ? "\033[32m" : bestScore < 0 ? "\033[31m" : "\033[0m") + Math.abs(bestScore) + "\033[0m" + " - " +
                         (score > 0 ? "\033[32m" : score < 0 ? "\033[31m" : "\033[0m") + Math.abs(score) + "\033[0m" + " - index: " + i +
-                        " - (" + getCoolString(turn) + ")");
+                        " - (" + getCoolString(turn) + ") - " + timerString(System.currentTimeMillis() - startTime2));
 
                 if (beta <= alpha) {
                     System.out.println("Alpha-Beta Pruning stopped the continuation");
@@ -89,10 +98,25 @@ public class Player {
             }
 
             System.out.println("best_turns len " + bestTurns.size() + " - (" + bestScore + ")");
-            System.out.println("time for d" + depth + ": " + (System.currentTimeMillis() - startTime) + " ms");
+            System.out.println("time for d" + depth + ": " + timerString(System.currentTimeMillis() - startTime));
             Random random = new Random();
             return bestTurns.get(random.nextInt(bestTurns.size()));
         }
+    }
+
+    private String timerString(long number) {
+        long totalSeconds = number / 1000;
+        long minutes = totalSeconds / 60;
+        double seconds = (number % 60000) / 1000.0;
+
+        return String.format(Locale.US, "<%d min, %.3f s>", minutes, seconds);
+    }
+
+    private String numberSplit(double number) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
+        symbols.setGroupingSeparator('_');
+        DecimalFormat formatter = new DecimalFormat("#,###.#####", symbols);
+        return formatter.format(number);
     }
 
     private String getCoolString(Turn turn) {
@@ -100,7 +124,7 @@ public class Player {
         if (turn.move1 != null) out += "m";
         if (turn.move2 != null) out += "m";
         if (turn.move3 != null) out += "m";
-        if (turn.move1 != null && turn.move2 != null &&turn.move3 != null) out += "x";
+        if (turn.move1 == null && turn.move2 == null &&turn.move3 == null) out += "x";
         if (turn.attack != null) {
             out += "a";
         } else {
@@ -153,6 +177,53 @@ public class Player {
 
         transpositionTable.put(fen, bestScore);
         return bestScore;
+    }
+
+    private void iterativeQuickSort(ArrayList<Turn> possibleTurns, ArrayList<Double> initialScores, boolean isMaximizingPlayer) {
+        Stack<int[]> stack = new Stack<>();
+        stack.push(new int[]{0, possibleTurns.size() - 1});
+
+        while (!stack.isEmpty()) {
+            int[] range = stack.pop();
+            int low = range[0];
+            int high = range[1];
+
+            if (low < high) {
+                int pi = partition(possibleTurns, initialScores, low, high, isMaximizingPlayer);
+                stack.push(new int[]{low, pi - 1});
+                stack.push(new int[]{pi + 1, high});
+            }
+        }
+    }
+
+    private int partition(ArrayList<Turn> possibleTurns, ArrayList<Double> initialScores, int low, int high, boolean isMaximizingPlayer) {
+        double pivot = initialScores.get(high);
+        int i = low - 1;
+        for (int j = low; j < high; j++) {
+            if (isMaximizingPlayer) {
+                if (initialScores.get(j) > pivot) {
+                    i++;
+                    swap(possibleTurns, initialScores, i, j);
+                }
+            } else {
+                if (initialScores.get(j) < pivot) {
+                    i++;
+                    swap(possibleTurns, initialScores, i, j);
+                }
+            }
+        }
+        swap(possibleTurns, initialScores, i + 1, high);
+        return i + 1;
+    }
+
+    private void swap(ArrayList<Turn> possibleTurns, ArrayList<Double> initialScores, int i, int j) {
+        Turn tempTurn = possibleTurns.get(i);
+        possibleTurns.set(i, possibleTurns.get(j));
+        possibleTurns.set(j, tempTurn);
+
+        double tempScore = initialScores.get(i);
+        initialScores.set(i, initialScores.get(j));
+        initialScores.set(j, tempScore);
     }
 
     public boolean getIsHuman() {

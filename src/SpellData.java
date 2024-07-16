@@ -163,15 +163,9 @@ public class SpellData {
     private void pushBackAirOffense(Tile[][] board, int x, int y, int direction) {
         int[] sequence = new int[8];
         if (direction == 1) {
-            // Direction 1: (8)(7)(6)
-            //              (5)(x,y)(4)
-            //              (3)(2)(1)
-            sequence = new int[]{1, 2, 3, 4, 6, 7, 8};
+            sequence = new int[]{8, 7, 6, 5, 4, 3, 2, 1};
         } else if (direction == -1) {
-            // Direction -1: (1)(2)(3)
-            //               (4)(x,y)(5)
-            //               (6)(7)(8)
-            sequence = new int[]{3, 2, 1, 8, 6, 5, 4};
+            sequence = new int[]{1, 2, 3, 4, 5, 6, 7, 8};
         }
 
         for (int i : sequence) {
